@@ -1,0 +1,19 @@
+{
+  "name": "clomata",
+  "owner": {
+    "name": "clomia",
+    "email": "clomia.dev@gmail.com"
+  },
+  "metadata": {
+    "description": "Stop hook 기반 감독관 플러그인"
+  },
+  "plugins": [
+    {
+      "name": "clomata",
+      "source": ".",
+      "description": "수행자가 완료를 선언할 때마다 독립적으로 평가하여 미탐색 방향을 반복 주입하는 감독관",
+      "version": "0.1.0",
+      "keywords": ["supervisor", "stop-hook", "cognitive-load", "quality-gate"]
+    }
+  ]
+}
