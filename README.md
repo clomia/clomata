@@ -19,20 +19,33 @@ Stop hook 기반 감독관 플러그인. 수행자가 완료를 선언할 때마
 ## 설치
 
 ```bash
-claude --plugin-dir /path/to/clomata
+git clone https://github.com/clomia/clomata.git ~/.claude/clomata
+```
+
+## 사용
+
+```bash
+claude --plugin-dir ~/.claude/clomata
+```
+
+환경변수로 라운드 수를 조정할 수 있다:
+
+```bash
+CLOMATA_MAX_ROUNDS=5 claude --plugin-dir ~/.claude/clomata
 ```
 
 ## 설정
 
-환경변수로 동작을 조정:
-
-| 변수 | 기본값 | 설명 |
-|------|--------|------|
+| 환경변수 | 기본값 | 설명 |
+|----------|--------|------|
 | `CLOMATA_MAX_ROUNDS` | `3` | 최대 평가 라운드 수 |
 | `CLOMATA_MODEL` | `opus` | 감독관이 사용할 모델 |
 
 ## 런타임 파일
 
-프로젝트 디렉토리에 생성됨 (.gitignore 권장):
-- `.clomata-state.json` — 라운드 카운터
-- `.clomata-debug.log` — 디버그 로그
+프로젝트 디렉토리에 생성된다. `.gitignore`에 추가를 권장:
+
+```
+.clomata-state.json
+.clomata-debug.log
+```
