@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run \"${CLAUDE_PLUGIN_ROOT}/scripts/booster.py\"",
+            "command": "uv run \"${CLAUDE_PLUGIN_ROOT}/scripts/parallax.py\"",
             "timeout": 180
           }
         ]

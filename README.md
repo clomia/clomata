@@ -1,68 +1,70 @@
 # claude-automata
 
-LLM의 좁아진 인지 범위를 확장하는 Claude Code 플러그인 마켓플레이스.
+English | [한국어](README.ko.md)
 
-## booster 플러그인
+A Claude Code plugin marketplace that expands the LLM's entropy scope.
 
-LLM은 토큰을 생성하면서 확률 분포가 좁아진다. 숲에서 나무, 나무에서 나뭇잎으로 시야가 좁아지면 다른 나무나 숲을 고려할 수 없게 된다. 그래서 인간이 출력을 훑어보고 미탐색 방향을 제시하는 패턴이 반복된다.
+## parallax plugin
 
-booster는 이 인간의 역할을 재현한다:
+LLMs suffer from **entropy scope** limitations — they operate only within the explicit surface of the given instruction, unable to spontaneously expand into the additional considerations needed to fully achieve its intent. When told to "review this code," an LLM performs a surface-level review and stops. A human would naturally expand into meta-review, structural checks, testing, and more.
+
+parallax breaks this limitation. From a separate perspective (a separate `claude -p` context), it skims the agent's output and injects unexplored directions:
 
 ```
-에이전트 출력 종료 → Stop hook 발동
-  → 부스터(별도 컨텍스트)가 출력을 훑어봄
-  → 미탐색 방향이 있으면 block + 방향 주입 → 에이전트 계속 작업
-  → 없거나 최대 라운드 도달 → 종료 허용
+Agent output complete → Stop hook fires
+  → parallax (separate context) skims the output
+  → Unexplored directions found → block + inject direction → agent continues
+  → None found or max rounds reached → allow stop
 ```
 
-기존 Stop hook 구현들(ralph loop 등)과의 차이:
-- **컨텍스트 분리**: 에이전트의 좁아진 확률 분포에 오염되지 않은 별도 컨텍스트에서 훑어봄
-- **방향 주입**: 단순 반복 프롬프트가 아니라 미탐색 방향을 추상적으로 제시
-- **반복 부스트**: 1회가 아닌 N회 라운드
+How parallax differs from existing Stop hook implementations (e.g. ralph loop):
+- **Separate perspective**: Skims from a context uncontaminated by the agent's narrowed entropy scope
+- **Direction injection**: Not a repeated generic prompt, but specific unexplored directions stated abstractly
+- **Iterative**: Not a single pass, but up to N rounds of expansion
 
-## 설치
+## Install
 
-Claude Code 안에서:
+In Claude Code:
 
 ```
 /plugin marketplace add clomia/claude-automata
-/plugin install booster@claude-automata
+/plugin install parallax@claude-automata
 ```
 
-## 전제 조건
+## Prerequisites
 
-[uv](https://docs.astral.sh/uv/) 설치 필요:
+[uv](https://docs.astral.sh/uv/) is required:
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-## 설정
+## Configuration
 
-| 환경변수 | 기본값 | 설명 |
-|----------|--------|------|
-| `BOOSTER_MAX_ROUNDS` | `3` | 최대 부스트 라운드 수 |
-| `BOOSTER_MODEL` | `opus` | 부스터가 사용할 모델 |
+| Environment variable | Default | Description |
+|---|---|---|
+| `PARALLAX_MAX_ROUNDS` | `3` | Maximum number of rounds |
+| `PARALLAX_MODEL` | `opus` | Model used by parallax |
 
-예: 5라운드로 실행
+Example: run with 5 rounds
 
 ```bash
-BOOSTER_MAX_ROUNDS=5 claude
+PARALLAX_MAX_ROUNDS=5 claude
 ```
 
-## 제거
+## Uninstall
 
 ```
-/plugin uninstall booster@claude-automata
+/plugin uninstall parallax@claude-automata
 /plugin marketplace remove claude-automata
 ```
 
-## 런타임 파일
+## Runtime files
 
-`~/.claude/plugins/data/` 하위에 세션별 상태와 디버그 로그가 저장된다.
-`CLAUDE_PLUGIN_DATA`가 없는 환경에서는 프로젝트 디렉토리에 폴백:
+Session state and debug logs are stored under `~/.claude/plugins/data/`.
+Falls back to the project directory when `CLAUDE_PLUGIN_DATA` is unavailable:
 
 ```
-.booster-state.json
-.booster-debug.log
+.parallax-state.json
+.parallax-debug.log
 ```

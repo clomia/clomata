@@ -5,15 +5,14 @@
     "email": "clomia.sig@gmail.com"
   },
   "metadata": {
-    "description": "LLM의 좁아진 인지 범위를 확장하는 플러그인 마켓플레이스"
+    "description": "Autonomization toolkit for Claude"
   },
   "plugins": [
     {
-      "name": "booster",
-      "source": "./plugins/booster",
-      "description": "Stop hook에서 LLM 출력을 훑어보고 미탐색 방향을 주입하여 인지 범위를 확장한다",
-      "version": "0.1.0",
-      "keywords": ["stop-hook", "cognitive-expansion", "exploration", "boost"]
+      "name": "parallax",
+      "source": "./plugins/parallax",
+      "description": "Expands the LLM's entropy scope by injecting unexplored directions from a separate perspective",
+      "version": "0.1.0"
     }
   ]
 }

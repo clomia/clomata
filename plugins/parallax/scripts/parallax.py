@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.14"
 # ///
-"""booster — LLM의 좁아진 인지 범위를 확장하는 Stop hook
+"""parallax — 별도 시점에서 LLM 출력을 다시 바라보고 미탐색 방향을 주입하는 Stop hook
 
 LLM이 출력을 종료할 때마다:
 1) 라운드 카운터 관리 (무한 루프 방지)
@@ -9,8 +9,8 @@ LLM이 출력을 종료할 때마다:
 3) 미탐색 방향이 있으면 block + 방향 주입, 없으면 종료 허용
 
 환경변수:
-  BOOSTER_MAX_ROUNDS  — 최대 부스트 라운드 (기본: 3)
-  BOOSTER_MODEL       — 부스터 모델 (기본: opus)
+  PARALLAX_MAX_ROUNDS  — 최대 라운드 (기본: 3)
+  PARALLAX_MODEL       — 사용할 모델 (기본: opus)
 """
 
 import json
@@ -21,8 +21,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-# ── 재귀 방지: 부스터의 claude -p 호출에서 이 hook이 다시 실행되면 무시 ──
-if os.environ.get("BOOSTER_ACTIVE") == "1":
+# ── 재귀 방지: parallax의 claude -p 호출에서 이 hook이 다시 실행되면 무시 ──
+if os.environ.get("PARALLAX_ACTIVE") == "1":
     sys.exit(0)
 
 # ── 입력 ──
@@ -32,12 +32,12 @@ last_msg = hook_input.get("last_assistant_message", "")
 session_id = hook_input.get("session_id", "default")
 
 # ── 설정 ──
-MAX_ROUNDS = int(os.environ.get("BOOSTER_MAX_ROUNDS", "3"))
-MODEL = os.environ.get("BOOSTER_MODEL", "opus")
+MAX_ROUNDS = int(os.environ.get("PARALLAX_MAX_ROUNDS", "3"))
+MODEL = os.environ.get("PARALLAX_MODEL", "opus")
 
 PLUGIN_ROOT = Path(os.environ.get("CLAUDE_PLUGIN_ROOT", Path(__file__).parent.parent))
 PLUGIN_DATA = os.environ.get("CLAUDE_PLUGIN_DATA", "")
-PROMPT_FILE = PLUGIN_ROOT / "scripts" / "booster-prompt.md"
+PROMPT_FILE = PLUGIN_ROOT / "scripts" / "parallax-prompt.md"
 
 # ── 상태/로그 파일 경로 ──
 if PLUGIN_DATA:
@@ -47,13 +47,13 @@ if PLUGIN_DATA:
     LOG_FILE = data_dir / "debug.log"
 else:
     project_dir = Path(os.environ.get("CLAUDE_PROJECT_DIR", "."))
-    STATE_FILE = project_dir / ".booster-state.json"
-    LOG_FILE = project_dir / ".booster-debug.log"
+    STATE_FILE = project_dir / ".parallax-state.json"
+    LOG_FILE = project_dir / ".parallax-debug.log"
 
 
 def log(msg: str) -> None:
     with open(LOG_FILE, "a") as f:
-        f.write(f"[booster] {datetime.now():%H:%M:%S} {msg}\n")
+        f.write(f"[parallax] {datetime.now():%H:%M:%S} {msg}\n")
 
 
 # ── 1. 라운드 관리 ──
@@ -77,8 +77,8 @@ log(f"round={round_num}/{MAX_ROUNDS} stop_hook_active={stop_hook_active}")
 
 # ── 2. 별도 컨텍스트에서 출력 훑어보기 ──
 truncated_msg = last_msg[:2000]
-booster_prompt = PROMPT_FILE.read_text()
-booster_input = f"""{booster_prompt}
+prompt_text = PROMPT_FILE.read_text()
+prompt_input = f"""{prompt_text}
 
 ---
 ## 에이전트의 마지막 응답:
@@ -86,30 +86,30 @@ booster_input = f"""{booster_prompt}
 ---
 위 프로토콜에 따라 JSON으로만 응답하라. 다른 텍스트를 출력하지 마라."""
 
-env = {**os.environ, "BOOSTER_ACTIVE": "1"}
+env = {**os.environ, "PARALLAX_ACTIVE": "1"}
 
 try:
     result = subprocess.run(
-        ["claude", "-p", booster_input, "--model", MODEL],
+        ["claude", "-p", prompt_input, "--model", MODEL],
         capture_output=True,
         text=True,
         env=env,
         timeout=120,
     )
-    booster_result = result.stdout.strip()
+    raw_result = result.stdout.strip()
 except (subprocess.TimeoutExpired, FileNotFoundError) as e:
-    log(f"WARN: booster call failed: {e}")
+    log(f"WARN: parallax call failed: {e}")
     sys.exit(0)
 
-log(f"booster raw: {booster_result[:500]}")
+log(f"raw: {raw_result[:500]}")
 
 # ── 3. 결과 파싱 ──
 try:
-    decision = json.loads(booster_result)
+    decision = json.loads(raw_result)
 except json.JSONDecodeError:
-    match = re.search(r"\{[^}]+\}", booster_result)
+    match = re.search(r"\{[^}]+\}", raw_result)
     if not match:
-        log("WARN: no JSON found in booster output, allowing stop")
+        log("WARN: no JSON found, allowing stop")
         sys.exit(0)
     try:
         decision = json.loads(match.group())
