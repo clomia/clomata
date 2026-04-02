@@ -16,7 +16,7 @@ A system that amplifies Claude Code's autonomy.
 
 LLMs generate tokens starting from the representation space activated by their input, and as generation proceeds, prior outputs tend to constrain subsequent exploration, narrowing the exploration scope. Exploring regions the model cannot spontaneously reach therefore requires input that activates new regions.
 
-This is one of the factors that, when using Claude Code, cause dissatisfaction with single-turn output and drive iteration across multiple turns.
+This is one of the factors that cause people using Claude Code to be dissatisfied with single-turn output and iterate across multiple turns.
 
 parallax generates and injects input that activates new regions, enabling the model to reach areas beyond its spontaneous reach — improving single-turn output quality.
 
