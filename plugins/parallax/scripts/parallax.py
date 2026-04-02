@@ -8,9 +8,7 @@ LLM이 출력을 종료할 때마다:
 2) 별도 claude -p 호출로 출력을 훑어봄 (컨텍스트 분리)
 3) 미탐색 방향이 있으면 block + 방향 주입, 없으면 종료 허용
 
-환경변수:
-  PARALLAX_MAX_ROUNDS  — 최대 라운드 (기본: 3)
-  PARALLAX_MODEL       — 사용할 모델 (기본: opus)
+세션의 모델을 transcript에서 자동 상속하고, effort는 항상 max를 사용한다.
 """
 
 import json
@@ -25,35 +23,55 @@ from pathlib import Path
 if os.environ.get("PARALLAX_ACTIVE") == "1":
     sys.exit(0)
 
+# ── 비활성화 체크 ──
+_pd = os.environ.get("CLAUDE_PLUGIN_DATA", "")
+if _pd and Path(_pd, "disabled").exists():
+    sys.exit(0)
+
 # ── 입력 ──
 hook_input = json.loads(sys.stdin.read())
 stop_hook_active = hook_input.get("stop_hook_active", False)
 last_msg = hook_input.get("last_assistant_message", "")
 session_id = hook_input.get("session_id", "default")
+transcript_path = hook_input.get("transcript_path", "")
 
 # ── 설정 ──
-MAX_ROUNDS = int(os.environ.get("PARALLAX_MAX_ROUNDS", "3"))
-MODEL = os.environ.get("PARALLAX_MODEL", "opus")
+MAX_ROUNDS = 7
 
 PLUGIN_ROOT = Path(os.environ.get("CLAUDE_PLUGIN_ROOT", Path(__file__).parent.parent))
 PLUGIN_DATA = os.environ.get("CLAUDE_PLUGIN_DATA", "")
 PROMPT_FILE = PLUGIN_ROOT / "scripts" / "parallax-prompt.md"
 
 # ── 상태/로그 파일 경로 ──
-if PLUGIN_DATA:
-    data_dir = Path(PLUGIN_DATA)
-    data_dir.mkdir(parents=True, exist_ok=True)
-    STATE_FILE = data_dir / f"{session_id}.json"
-    LOG_FILE = data_dir / "debug.log"
-else:
-    project_dir = Path(os.environ.get("CLAUDE_PROJECT_DIR", "."))
-    STATE_FILE = project_dir / ".parallax-state.json"
-    LOG_FILE = project_dir / ".parallax-debug.log"
+data_dir = Path(PLUGIN_DATA)
+data_dir.mkdir(parents=True, exist_ok=True)
+STATE_FILE = data_dir / f"{session_id}.json"
+LOG_FILE = data_dir / "debug.log"
 
 
 def log(msg: str) -> None:
     with open(LOG_FILE, "a") as f:
         f.write(f"[parallax] {datetime.now():%H:%M:%S} {msg}\n")
+
+
+def get_session_model(path: str) -> str | None:
+    """Transcript JSONL에서 세션 모델을 추출"""
+    model = None
+    if not path:
+        return model
+    try:
+        with open(path) as f:
+            for line in f:
+                try:
+                    obj = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                msg = obj.get("message", {})
+                if msg.get("role") == "assistant" and msg.get("model"):
+                    model = msg["model"]
+    except OSError:
+        pass
+    return model
 
 
 # ── 1. 라운드 관리 ──
@@ -75,7 +93,11 @@ if round_num > MAX_ROUNDS:
 STATE_FILE.write_text(json.dumps(state))
 log(f"round={round_num}/{MAX_ROUNDS} stop_hook_active={stop_hook_active}")
 
-# ── 2. 별도 컨텍스트에서 출력 훑어보기 ──
+# ── 2. 세션 설정 상속 ──
+model = get_session_model(transcript_path)
+log(f"session: model={model}")
+
+# ── 3. 별도 컨텍스트에서 출력 훑어보기 ──
 truncated_msg = last_msg[:2000]
 prompt_text = PROMPT_FILE.read_text()
 prompt_input = f"""{prompt_text}
@@ -88,9 +110,13 @@ prompt_input = f"""{prompt_text}
 
 env = {**os.environ, "PARALLAX_ACTIVE": "1"}
 
+cmd = ["claude", "-p", prompt_input, "--effort", "max"]
+if model:
+    cmd.extend(["--model", model])
+
 try:
     result = subprocess.run(
-        ["claude", "-p", prompt_input, "--model", MODEL],
+        cmd,
         capture_output=True,
         text=True,
         env=env,
@@ -103,7 +129,7 @@ except (subprocess.TimeoutExpired, FileNotFoundError) as e:
 
 log(f"raw: {raw_result[:500]}")
 
-# ── 3. 결과 파싱 ──
+# ── 4. 결과 파싱 ──
 try:
     decision = json.loads(raw_result)
 except json.JSONDecodeError:

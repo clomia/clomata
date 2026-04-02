@@ -2,7 +2,7 @@
 
 English | [한국어](README.ko.md)
 
-A Claude Code plugin marketplace that expands the LLM's entropy scope.
+A system that amplifies Claude's autonomy.
 
 ## parallax plugin
 
@@ -18,9 +18,10 @@ Agent output complete → Stop hook fires
 ```
 
 How parallax differs from existing Stop hook implementations (e.g. ralph loop):
+
 - **Separate perspective**: Skims from a context uncontaminated by the agent's narrowed entropy scope
 - **Direction injection**: Not a repeated generic prompt, but specific unexplored directions stated abstractly
-- **Iterative**: Not a single pass, but up to N rounds of expansion
+- **Iterative**: Not a single pass, but up to 7 rounds of expansion
 
 ## Install
 
@@ -39,18 +40,18 @@ In Claude Code:
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-## Configuration
+## Usage
 
-| Environment variable | Default | Description |
-|---|---|---|
-| `PARALLAX_MAX_ROUNDS` | `3` | Maximum number of rounds |
-| `PARALLAX_MODEL` | `opus` | Model used by parallax |
+- `/parallax off` — disable
+- `/parallax on` — enable
+- `/parallax` — check current status
 
-Example: run with 5 rounds
+## How it works
 
-```bash
-PARALLAX_MAX_ROUNDS=5 claude
-```
+- **Model**: Automatically inherits the main session's model (extracted from transcript)
+- **Effort**: Always max
+- **Max rounds**: 7
+- Zero configuration. No environment variables.
 
 ## Uninstall
 
@@ -61,10 +62,4 @@ PARALLAX_MAX_ROUNDS=5 claude
 
 ## Runtime files
 
-Session state and debug logs are stored under `~/.claude/plugins/data/`.
-Falls back to the project directory when `CLAUDE_PLUGIN_DATA` is unavailable:
-
-```
-.parallax-state.json
-.parallax-debug.log
-```
+Per-session state and debug logs are stored under `~/.claude/plugins/data/`.
