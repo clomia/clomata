@@ -2,7 +2,7 @@
 name = "parallax"
 version = "0.1.0"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = ["pydantic>=2.12.5"]
 
 [project.scripts]
 parallax = "src.main:main"
@@ -14,3 +14,9 @@ build-backend = "uv_build"
 [tool.uv.build-backend]
 module-root = ""
 module-name = "src"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "ruff>=0.15.9",
+]
