@@ -63,7 +63,7 @@ def extract_user_input(msg: dict) -> str | None:
     if isinstance(content, str):
         return content
     if isinstance(content, list):
-        if all(
+        if content and all(
             isinstance(item, dict) and item.get("type") == "tool_result"
             for item in content
         ):

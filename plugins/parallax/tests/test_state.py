@@ -75,7 +75,9 @@ class TestPluginEnvironment:
             is_disabled=False,
         )
         assert env.src_dir == Path("/plugin/root")
+        assert env.data_dir == Path("/plugin/data")
         assert env.is_inside_recursion is False
+        assert env.is_disabled is False
 
 
 # ── Turn state persistence ──
@@ -149,6 +151,10 @@ class TestExtractUserInput:
             "content": [{"type": "tool_result", "tool_use_id": "t1", "content": "ok"}],
         }
         assert extract_user_input(msg) is None
+
+    def test_empty_content_list(self):
+        msg = {"role": "user", "content": []}
+        assert extract_user_input(msg) == ""
 
 
 # ── parse_turn ──
@@ -291,6 +297,97 @@ class TestParseTurn:
         for actual, expected in zip(turn.agent_actions, current_actions):
             assert actual == expected
 
+    def test_parallel_tool_calls(self, tmp_path):
+        """Multiple tool_use in one assistant message, multiple tool_results in one user message."""
+        t = tmp_path / "t.jsonl"
+        write_jsonl(
+            t,
+            [
+                {"role": "user", "content": "search and read"},
+                {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "tool_use", "id": "t1", "name": "Glob"},
+                        {"type": "tool_use", "id": "t2", "name": "Grep"},
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "tool_result", "tool_use_id": "t1", "content": "a.py"},
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": "t2",
+                            "content": "match",
+                        },
+                    ],
+                },
+                {"role": "assistant", "content": "Found it."},
+            ],
+        )
+        turn = parse_turn(str(t))
+        assert turn.user_input == "search and read"
+        assert len(turn.agent_actions) == 3
+
+    def test_permission_denied(self, tmp_path):
+        """Permission denied is a tool_result with is_error=True."""
+        t = tmp_path / "t.jsonl"
+        write_jsonl(
+            t,
+            [
+                {"role": "user", "content": "read /etc/hosts"},
+                {
+                    "role": "assistant",
+                    "content": [{"type": "tool_use", "id": "t1", "name": "Read"}],
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": "t1",
+                            "content": "Permission denied",
+                            "is_error": True,
+                        }
+                    ],
+                },
+                {"role": "assistant", "content": "Access denied."},
+            ],
+        )
+        turn = parse_turn(str(t))
+        assert turn.user_input == "read /etc/hosts"
+        assert len(turn.agent_actions) == 3
+
+    def test_subagent_call(self, tmp_path):
+        """Agent tool call appears as tool_use(Agent) → tool_result."""
+        t = tmp_path / "t.jsonl"
+        write_jsonl(
+            t,
+            [
+                {"role": "user", "content": "find all TODO comments"},
+                {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "tool_use", "id": "t1", "name": "Agent", "input": {}},
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": "t1",
+                            "content": "Found 5 TODOs",
+                        }
+                    ],
+                },
+                {"role": "assistant", "content": "Here are the results."},
+            ],
+        )
+        turn = parse_turn(str(t))
+        assert turn.user_input == "find all TODO comments"
+        assert len(turn.agent_actions) == 3
+
     def test_truncated_last_line_skipped(self, tmp_path):
         """Partial JSONL line from concurrent write is safely skipped."""
         t = tmp_path / "t.jsonl"
@@ -404,6 +501,42 @@ class TestBuildStateRound1:
 
         assert state.turn.user_input == "now fix the tests"
         assert len(state.turn.agent_actions) == 1
+
+    def test_new_turn_overwrites_previous_state_file(self, tmp_path, monkeypatch):
+        """When a new turn starts (stop_hook_active=False), the state file from
+        the previous turn is overwritten with fresh data."""
+        t = tmp_path / "transcript.jsonl"
+        write_jsonl(
+            t,
+            [
+                {"role": "user", "content": "new task"},
+                {"role": "assistant", "content": "ok"},
+            ],
+        )
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        # Stale state file from previous turn
+        save_turn_state(
+            data_dir / "s1.json",
+            {"round": 5, "user_input": "old task"},
+        )
+        monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(tmp_path))
+        monkeypatch.setenv("CLAUDE_PLUGIN_DATA", str(data_dir))
+        monkeypatch.delenv("PARALLAX_INSIDE_RECURSION", raising=False)
+
+        state = build_state(
+            make_stdin(
+                stop_hook_active=False,
+                session_id="s1",
+                transcript_path=str(t),
+            )
+        )
+
+        assert state.current_round == 0
+        assert state.turn.user_input == "new task"
+        saved = json.loads((data_dir / "s1.json").read_text())
+        assert saved["user_input"] == "new task"
+        assert saved["round"] == 0
 
 
 # ── build_state: round 2+ (stop_hook_active=True) ──
@@ -648,6 +781,7 @@ class TestBuildStateRound2:
 
         # Corrupt file → empty dict → round=0, no saved user_input → transcript fallback
         assert state.current_round == 0
+        assert state.turn.user_input == "Stop hook feedback:\n[hook]: more"
 
 
 # ── build_state: environment ──
