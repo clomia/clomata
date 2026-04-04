@@ -8,15 +8,11 @@ On each LLM stop:
 
 import json
 import os
-import re
 import subprocess
 import sys
 
-from pydantic import BaseModel
-
 from src.prompt import build_analysis_prompt, format_conversion_prompt
 from src.state import ROUND_LIMIT, build_state, finish_round, save_initial_turn
-
 
 # ── claude -p invocation ──
 
@@ -56,29 +52,6 @@ def convert_actions_to_markdown(actions: list[dict], model: str | None) -> str:
     return result or json.dumps(actions, ensure_ascii=False, indent=2)
 
 
-# ── Analysis result ──
-
-
-class Decision(BaseModel):
-    """ok=True allows stop. ok=False injects reason via stderr and continues."""
-
-    ok: bool
-    reason: str = ""
-
-
-def parse_decision(raw: str | None) -> Decision | None:
-    """Extract JSON from analysis output and parse as Decision."""
-    if not raw:
-        return None
-    match = re.search(r"\{.*\}", raw)
-    if not match:
-        return None
-    try:
-        return Decision.model_validate_json(match.group())
-    except Exception:
-        return None
-
-
 # ── Execution flow ──
 
 
@@ -100,14 +73,13 @@ def main():
     prompt = build_analysis_prompt(
         state.turn.user_input, action_history, state.direction_history
     )
-    raw = invoke_claude(prompt, state.turn.agent_model, effort="max")
-    decision = parse_decision(raw)
+    new_direction = invoke_claude(prompt, state.turn.agent_model, effort="max")
 
-    if decision is None or decision.ok:
+    if not new_direction or new_direction == "null":
         sys.exit(0)
 
-    finish_round(state, decision.reason)
-    print(decision.reason, file=sys.stderr)
+    finish_round(state, new_direction)
+    sys.stderr.write(new_direction)
     sys.exit(2)
 
 

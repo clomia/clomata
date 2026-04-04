@@ -1,10 +1,10 @@
-"""Tests for main module — subprocess calls, decision parsing, and execution flow."""
+"""Tests for main module — subprocess calls, direction parsing, and execution flow."""
 
 import json
 import subprocess
 from unittest.mock import patch
 
-from src.main import convert_actions_to_markdown, invoke_claude, parse_decision
+from src.main import convert_actions_to_markdown, invoke_claude
 
 
 # ── invoke_claude ──
@@ -90,46 +90,3 @@ class TestConvertActionsToMarkdown:
         with patch("src.main.subprocess.run", return_value=mock_result):
             result = convert_actions_to_markdown(actions, None)
             assert result == json.dumps(actions, ensure_ascii=False, indent=2)
-
-
-# ── parse_decision ──
-
-
-class TestParseDecision:
-    def test_ok_true(self):
-        d = parse_decision('{"ok": true}')
-        assert d is not None
-        assert d.ok is True
-
-    def test_ok_false_with_reason(self):
-        d = parse_decision('{"ok": false, "reason": "Add error handling"}')
-        assert d is not None
-        assert d.ok is False
-        assert d.reason == "Add error handling"
-
-    def test_extracts_json_from_surrounding_text(self):
-        raw = 'Here is my analysis:\n\n{"ok": false, "reason": "Add tests"}\n\nDone.'
-        d = parse_decision(raw)
-        assert d is not None
-        assert d.reason == "Add tests"
-
-    def test_extracts_json_from_markdown_code_block(self):
-        raw = '```json\n{"ok": true}\n```'
-        d = parse_decision(raw)
-        assert d is not None
-        assert d.ok is True
-
-    def test_returns_none_for_none_input(self):
-        assert parse_decision(None) is None
-
-    def test_returns_none_for_empty_string(self):
-        assert parse_decision("") is None
-
-    def test_returns_none_for_no_json(self):
-        assert parse_decision("No JSON here at all") is None
-
-    def test_returns_none_for_invalid_json(self):
-        assert parse_decision("{not valid json}") is None
-
-    def test_returns_none_for_wrong_schema(self):
-        assert parse_decision('{"answer": 42}') is None

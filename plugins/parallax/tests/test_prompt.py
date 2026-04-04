@@ -54,7 +54,7 @@ class TestLoadPromptFile:
     def test_loads_instruction_md(self):
         content = load_prompt_file("instruction.md")
         assert "# 지시사항" in content
-        assert '{"ok": true}' in content
+        assert "`null`" in content
 
 
 # ── format_conversion_prompt ──
