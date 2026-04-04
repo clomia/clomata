@@ -6,7 +6,8 @@
           {
             "type": "command",
             "command": "uv run --project \"${CLAUDE_PLUGIN_ROOT}\" parallax",
-            "timeout": 300
+            "timeout": 300,
+            "statusMessage": "running parallax"
           }
         ]
       }
