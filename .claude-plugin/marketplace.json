@@ -11,7 +11,7 @@
     {
       "name": "parallax",
       "source": "./plugins/parallax",
-      "description": "Expands the LLM's entropy scope by injecting unexplored directions from a separate perspective",
+      "description": "Finds and injects directions beyond the model's narrowing focus",
       "version": "0.1.0"
     }
   ]

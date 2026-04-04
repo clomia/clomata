@@ -1,13 +1,18 @@
 ---
 name: parallax
-description: parallax 플러그인 활성화/비활성화
+description: Toggle parallax plugin on/off
 ---
 
-`/parallax` 커맨드 인수: $ARGUMENTS
+`/parallax` command arguments: $ARGUMENTS
 
-## 동작
-- `off`: `${CLAUDE_PLUGIN_DATA}/disabled` 파일을 생성하여 비활성화
-- `on`: `${CLAUDE_PLUGIN_DATA}/disabled` 파일을 삭제하여 활성화
-- 인수 없음: `${CLAUDE_PLUGIN_DATA}/disabled` 파일 존재 여부로 현재 상태 확인
+## Behavior
 
-결과를 한 줄로 보고하라.
+- `off`: Deactivate parallax. Create the `${CLAUDE_PLUGIN_DATA}/disabled` file.
+- `on`: Activate parallax. Remove the `${CLAUDE_PLUGIN_DATA}/disabled` file.
+- No arguments: Check current activation status.
+
+## Response format
+
+Report the result in a single line:
+- `parallax: on`
+- `parallax: off`
