@@ -1,4 +1,4 @@
-"""Captures all external inputs for a parallax run into a single State object."""
+"""State construction and persistence for a parallax run."""
 
 import json
 import os
@@ -26,7 +26,6 @@ class HookInput(BaseModel):
 class PluginEnvironment(BaseModel):
     """Plugin runtime environment from env vars and filesystem."""
 
-    src_dir: Path
     data_dir: Path
     is_inside_recursion: bool
     is_disabled: bool
@@ -49,6 +48,7 @@ class State(BaseModel):
     hook: HookInput
     env: PluginEnvironment
     current_round: int = 0
+    direction_history: list[str] = []
     turn: Turn
 
 
@@ -124,7 +124,7 @@ def load_turn_state(state_file: Path) -> dict:
         return {}
     try:
         return json.loads(state_file.read_text())
-    except (json.JSONDecodeError, OSError):
+    except json.JSONDecodeError, OSError:
         return {}
 
 
@@ -133,18 +133,39 @@ def save_turn_state(state_file: Path, data: dict) -> None:
     state_file.write_text(json.dumps(data))
 
 
+def save_initial_turn(state: "State") -> None:
+    """Persist user_input and empty directions for round 1. Called by main."""
+    path = state.env.data_dir / f"{state.hook.session_id}.json"
+    save_turn_state(
+        path, {"round": 0, "user_input": state.turn.user_input, "directions": []}
+    )
+
+
+def finish_round(state: "State", new_direction: str) -> None:
+    """Persist round result: increment counter and append direction. Called by main."""
+    path = state.env.data_dir / f"{state.hook.session_id}.json"
+    save_turn_state(
+        path,
+        {
+            "round": state.current_round + 1,
+            "user_input": state.turn.user_input,
+            "directions": [*state.direction_history, new_direction],
+        },
+    )
+
+
 # ── State assembly ──
 
 
 def build_state(stdin_raw: str) -> State:
-    """Collect all external inputs and assemble a State.
+    """Collect all external inputs and assemble a State. No side effects.
 
     Uses stop_hook_active (documented in Hooks Reference) to decide whether
     to parse user_input from the transcript or load it from the state file:
 
     - stop_hook_active=False (round 1): No hook feedback exists in the
       transcript yet, so the last user(str) message is reliably the real
-      prompt. Parsed user_input is saved to the state file.
+      prompt. Caller should persist via save_initial_turn().
 
     - stop_hook_active=True (round 2+): Hook feedback has been injected as
       a user(str) message, which would be misidentified as the prompt.
@@ -156,7 +177,6 @@ def build_state(stdin_raw: str) -> State:
 
     data_dir = Path(os.environ["CLAUDE_PLUGIN_DATA"])
     env = PluginEnvironment(
-        src_dir=Path(os.environ["CLAUDE_PLUGIN_ROOT"]),
         data_dir=data_dir,
         is_inside_recursion=os.environ.get("PARALLAX_INSIDE_RECURSION") == "1",
         is_disabled=(data_dir / "disabled").exists(),
@@ -168,6 +188,7 @@ def build_state(stdin_raw: str) -> State:
 
     if hook.stop_hook_active:
         current_round = turn_state.get("round", 0)
+        direction_history = turn_state.get("directions", [])
         saved_user_input = turn_state.get("user_input")
         if saved_user_input is not None:
             turn = Turn(
@@ -177,6 +198,12 @@ def build_state(stdin_raw: str) -> State:
             )
     else:
         current_round = 0
-        save_turn_state(state_file, {"round": 0, "user_input": turn.user_input})
+        direction_history = []
 
-    return State(hook=hook, env=env, current_round=current_round, turn=turn)
+    return State(
+        hook=hook,
+        env=env,
+        current_round=current_round,
+        direction_history=direction_history,
+        turn=turn,
+    )
