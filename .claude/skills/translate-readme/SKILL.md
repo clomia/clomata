@@ -1,5 +1,7 @@
 ---
+name: translate-readme
 description: 한국어 버전 README로 영어 원본 README를 작성합니다.
+disable-model-invocation: true
 ---
 
 1. @README.md 를 삭제합니다.
