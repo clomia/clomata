@@ -28,9 +28,8 @@ def invoke_claude(
     *,
     allow_tools: bool = False,
     effort: str | None = None,
-    timeout: int = 120,
 ) -> str | None:
-    """Run claude -p and return stdout. Returns None on failure or timeout."""
+    """Run claude -p and return stdout. Returns None on failure."""
     cmd = ["claude", "-p", prompt, "--no-session-persistence"]
     if allow_tools:
         cmd.extend(["--disallowedTools", DISALLOWED_TOOLS])
@@ -41,14 +40,9 @@ def invoke_claude(
     if effort:
         cmd.extend(["--effort", effort])
     env = {**os.environ, "PARALLAX_INSIDE_RECURSION": "1"}
-    try:
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, env=env, timeout=timeout
-        )
-        if result.returncode == 0 and result.stdout.strip():
-            return result.stdout.strip()
-    except subprocess.TimeoutExpired:
-        pass
+    result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+    if result.returncode == 0 and result.stdout.strip():
+        return result.stdout.strip()
     return None
 
 

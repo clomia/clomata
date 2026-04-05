@@ -31,13 +31,6 @@ class TestInvokeClaude:
         with patch("src.main.subprocess.run", return_value=mock_result):
             assert invoke_claude("test") is None
 
-    def test_returns_none_on_timeout(self):
-        with patch(
-            "src.main.subprocess.run",
-            side_effect=subprocess.TimeoutExpired("cmd", 120),
-        ):
-            assert invoke_claude("test") is None
-
     def test_passes_model_flag(self):
         mock_result = subprocess.CompletedProcess(
             args=[], returncode=0, stdout="ok", stderr=""
