@@ -13,9 +13,11 @@ ROLE_PROMPT = (PROMPTS_DIR / "role.md").read_text().strip()
 INSTRUCTION_PROMPT = (PROMPTS_DIR / "instruction.md").read_text().strip()
 
 CONVERSION_PROMPT_TEMPLATE = """\
-다음은 AI 에이전트가 사용자의 요청에 대해 수행한 작업 기록입니다.
-이 작업 기록을 설명하는 마크다운 문서를 작성하세요.
-에이전트가 어떤 도구를 사용했고, 어떤 결과를 얻었으며, 어떤 판단을 내렸는지 서술하세요.
+This is the main agent's task execution record.
+Produce a markdown document describing this record.
+Enumerate the agent's thoughts, attempts, and results systematically, leaving nothing out.
+
+Ignore metadata outside the agent's own awareness, such as token usage or API turn counts.
 
 <action-record>
 {actions_json}
