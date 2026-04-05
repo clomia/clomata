@@ -10,6 +10,7 @@ import json
 import os
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 from src.prompt import build_analysis_prompt, format_conversion_prompt
@@ -61,6 +62,21 @@ def convert_actions_to_markdown(actions: list[dict], model: str | None) -> str:
     return result or json.dumps(actions, ensure_ascii=False, indent=2)
 
 
+# ── Logging ──
+
+
+def write_log(log_file: Path, round_number: int, *, new_turn: bool, **sections: str):
+    """Append a round's log to the session log file. Overwrites on new turn."""
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    header = f"# Round {round_number} — {timestamp}\n\n"
+    body = ""
+    for title, content in sections.items():
+        body += f"## {title}\n\n{content}\n\n"
+    mode = "w" if new_turn else "a"
+    with open(log_file, mode) as f:
+        f.write(header + body)
+
+
 # ── Entry points ──
 
 
@@ -71,11 +87,14 @@ def run():
     if state.env.is_inside_recursion or state.env.is_disabled:
         sys.exit(0)
 
-    if not state.hook.stop_hook_active:
+    new_turn = not state.hook.stop_hook_active
+    if new_turn:
         save_initial_turn(state)
 
     if state.current_round >= ROUND_LIMIT:
         sys.exit(0)
+
+    log_file = state.env.data_dir / f"{state.hook.session_id}_parallax.log"
 
     action_history = convert_actions_to_markdown(
         state.turn.agent_actions, state.turn.agent_model
@@ -85,6 +104,14 @@ def run():
     )
     new_direction = invoke_claude(
         prompt, state.turn.agent_model, allow_tools=True, effort="max"
+    )
+
+    write_log(
+        log_file,
+        state.current_round + 1,
+        new_turn=new_turn,
+        analysis_prompt=prompt,
+        new_direction=new_direction or "null",
     )
 
     if not new_direction or new_direction == "null":
