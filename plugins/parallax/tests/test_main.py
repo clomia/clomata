@@ -1,11 +1,20 @@
-"""Tests for main module — subprocess invocation, markdown conversion, and prompt capture."""
+"""Tests for main module — subprocess invocation, markdown conversion, logging, orchestration, and prompt capture."""
 
 import io
 import json
 import subprocess
 from unittest.mock import patch
 
-from src.main import capture_user_prompt, convert_actions_to_markdown, invoke_claude
+import pytest
+
+from src.main import (
+    capture_user_prompt,
+    convert_actions_to_markdown,
+    invoke_claude,
+    run,
+    write_log,
+)
+from src.state import ROUND_LIMIT, HookInput, PluginEnvironment, State, Turn
 
 
 # ── invoke_claude ──
@@ -144,3 +153,168 @@ class TestCaptureUserPrompt:
 
         written = (tmp_path / "sess1_last_user_prompt.txt").read_text()
         assert written == ""
+
+
+# ── write_log ──
+
+
+class TestWriteLog:
+    def test_creates_header_and_sections(self, tmp_path):
+        log = tmp_path / "test.log"
+        write_log(log, 1, new_turn=True, prompt="the prompt", direction="go left")
+        content = log.read_text()
+        assert "# Round 1 — " in content
+        assert "## prompt\n\nthe prompt\n\n" in content
+        assert "## direction\n\ngo left\n\n" in content
+
+    def test_new_turn_overwrites(self, tmp_path):
+        log = tmp_path / "test.log"
+        log.write_text("old content\n")
+        write_log(log, 1, new_turn=True, note="fresh")
+        content = log.read_text()
+        assert "old content" not in content
+        assert "# Round 1" in content
+
+    def test_appends_without_new_turn(self, tmp_path):
+        log = tmp_path / "test.log"
+        write_log(log, 1, new_turn=True, note="round 1")
+        write_log(log, 2, new_turn=False, note="round 2")
+        content = log.read_text()
+        assert "# Round 1" in content
+        assert "# Round 2" in content
+
+
+# ── run ──
+
+
+class TestRun:
+    def _make_state(self, tmp_path, **overrides):
+        defaults = dict(
+            is_inside_recursion=False,
+            is_disabled=False,
+            stop_hook_active=False,
+            current_round=0,
+            direction_history=[],
+        )
+        defaults.update(overrides)
+        return State(
+            hook=HookInput(
+                stop_hook_active=defaults["stop_hook_active"],
+                last_assistant_message="done",
+                session_id="s1",
+                transcript_path=str(tmp_path / "t.jsonl"),
+            ),
+            env=PluginEnvironment(
+                data_dir=tmp_path,
+                is_inside_recursion=defaults["is_inside_recursion"],
+                is_disabled=defaults["is_disabled"],
+            ),
+            current_round=defaults["current_round"],
+            direction_history=defaults["direction_history"],
+            turn=Turn(
+                user_input="fix bug",
+                agent_actions=[],
+                agent_model="claude-opus-4-6",
+            ),
+        )
+
+    def test_exits_on_recursion(self, tmp_path):
+        state = self._make_state(tmp_path, is_inside_recursion=True)
+        with (
+            patch("src.main.build_state", return_value=state),
+            patch("sys.stdin", io.StringIO("")),
+            pytest.raises(SystemExit) as exc,
+        ):
+            run()
+        assert exc.value.code == 0
+
+    def test_exits_on_disabled(self, tmp_path):
+        state = self._make_state(tmp_path, is_disabled=True)
+        with (
+            patch("src.main.build_state", return_value=state),
+            patch("sys.stdin", io.StringIO("")),
+            pytest.raises(SystemExit) as exc,
+        ):
+            run()
+        assert exc.value.code == 0
+
+    def test_exits_on_round_limit(self, tmp_path):
+        state = self._make_state(
+            tmp_path, stop_hook_active=True, current_round=ROUND_LIMIT
+        )
+        with (
+            patch("src.main.build_state", return_value=state),
+            patch("sys.stdin", io.StringIO("")),
+            pytest.raises(SystemExit) as exc,
+        ):
+            run()
+        assert exc.value.code == 0
+
+    def test_saves_initial_turn_on_new_turn(self, tmp_path):
+        state = self._make_state(tmp_path, stop_hook_active=False)
+        with (
+            patch("src.main.build_state", return_value=state),
+            patch("sys.stdin", io.StringIO("")),
+            patch("src.main.save_initial_turn") as mock_save,
+            patch("src.main.convert_actions_to_markdown", return_value="md"),
+            patch("src.main.invoke_claude", return_value=None),
+            pytest.raises(SystemExit),
+        ):
+            run()
+        mock_save.assert_called_once_with(state)
+
+    def test_skips_save_on_existing_turn(self, tmp_path):
+        state = self._make_state(tmp_path, stop_hook_active=True, current_round=1)
+        with (
+            patch("src.main.build_state", return_value=state),
+            patch("sys.stdin", io.StringIO("")),
+            patch("src.main.save_initial_turn") as mock_save,
+            patch("src.main.convert_actions_to_markdown", return_value="md"),
+            patch("src.main.invoke_claude", return_value=None),
+            pytest.raises(SystemExit),
+        ):
+            run()
+        mock_save.assert_not_called()
+
+    def test_exits_when_no_direction(self, tmp_path):
+        state = self._make_state(tmp_path)
+        with (
+            patch("src.main.build_state", return_value=state),
+            patch("sys.stdin", io.StringIO("")),
+            patch("src.main.save_initial_turn"),
+            patch("src.main.convert_actions_to_markdown", return_value="md"),
+            patch("src.main.invoke_claude", return_value=None),
+            pytest.raises(SystemExit) as exc,
+        ):
+            run()
+        assert exc.value.code == 0
+
+    def test_exits_when_direction_is_null_string(self, tmp_path):
+        state = self._make_state(tmp_path)
+        with (
+            patch("src.main.build_state", return_value=state),
+            patch("sys.stdin", io.StringIO("")),
+            patch("src.main.save_initial_turn"),
+            patch("src.main.convert_actions_to_markdown", return_value="md"),
+            patch("src.main.invoke_claude", return_value="null"),
+            pytest.raises(SystemExit) as exc,
+        ):
+            run()
+        assert exc.value.code == 0
+
+    def test_injects_direction_and_exits_2(self, tmp_path):
+        state = self._make_state(tmp_path)
+        with (
+            patch("src.main.build_state", return_value=state),
+            patch("sys.stdin", io.StringIO("")),
+            patch("src.main.save_initial_turn"),
+            patch("src.main.convert_actions_to_markdown", return_value="md"),
+            patch("src.main.invoke_claude", return_value="Add error handling"),
+            patch("src.main.finish_round") as mock_finish,
+            patch("sys.stderr") as mock_stderr,
+            pytest.raises(SystemExit) as exc,
+        ):
+            run()
+        assert exc.value.code == 2
+        mock_stderr.write.assert_called_once_with("Add error handling")
+        mock_finish.assert_called_once_with(state, "Add error handling")

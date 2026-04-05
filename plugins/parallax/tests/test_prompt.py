@@ -97,7 +97,7 @@ class TestBuildAnalysisPrompt:
         assert "<direction-1>" in prompt
         assert "Add validation" in prompt
         assert "<instructions>" in prompt
-        assert "지시사항" in prompt
+        assert "Explore thought regions" in prompt
 
     def test_sections_are_in_correct_order(self):
         prompt = build_analysis_prompt("input", "actions", [])
