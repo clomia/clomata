@@ -33,6 +33,17 @@ class TestInvokeClaude:
             assert "-p" in cmd
             assert "--no-session-persistence" in cmd
 
+    def test_pipes_prompt_via_stdin(self):
+        mock_result = subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="ok", stderr=""
+        )
+        with patch("src.main.subprocess.run", return_value=mock_result) as mock_run:
+            invoke_claude("my prompt text")
+            assert mock_run.call_args[1]["input"] == "my prompt text"
+            cmd = mock_run.call_args[0][0]
+            assert "my prompt text" not in cmd
+            assert "Follow the instructions in the input." in cmd
+
     def test_returns_none_on_failure(self):
         mock_result = subprocess.CompletedProcess(
             args=[], returncode=1, stdout="", stderr="error"
@@ -109,8 +120,8 @@ class TestConvertActionsToMarkdown:
         with patch("src.main.subprocess.run", return_value=mock_result) as mock_run:
             result = convert_actions_to_markdown(actions, "claude-opus-4-6")
             assert result == "# Actions\n\nThe agent responded."
-            prompt_arg = mock_run.call_args[0][0][2]
-            assert json.dumps(actions, ensure_ascii=False, indent=2) in prompt_arg
+            stdin_prompt = mock_run.call_args[1]["input"]
+            assert json.dumps(actions, ensure_ascii=False, indent=2) in stdin_prompt
 
     def test_falls_back_to_raw_json_on_failure(self):
         actions = [{"role": "assistant", "content": "hello"}]

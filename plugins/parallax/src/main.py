@@ -22,6 +22,9 @@ from src.state import ROUND_LIMIT, build_state, finish_round, save_initial_turn
 DISALLOWED_TOOLS = "Bash,Write,Edit,NotebookEdit"
 
 
+STDIN_INSTRUCTION = "Follow the instructions in the input."
+
+
 def invoke_claude(
     prompt: str,
     model: str | None = None,
@@ -29,8 +32,14 @@ def invoke_claude(
     allow_tools: bool = False,
     effort: str | None = None,
 ) -> str | None:
-    """Run claude -p and return stdout. Returns None on failure."""
-    cmd = ["claude", "-p", prompt, "--no-session-persistence"]
+    """Run claude -p and return stdout. Returns None on failure.
+
+    The prompt is piped via stdin to avoid OSError when the content exceeds
+    the OS argument-list limit (ARG_MAX ~1 MB on macOS).  A short positional
+    prompt tells the model to follow the piped instructions — matching the
+    documented ``cat file | claude -p "query"`` pattern.
+    """
+    cmd = ["claude", "-p", STDIN_INSTRUCTION, "--no-session-persistence"]
     if allow_tools:
         cmd.extend(["--disallowedTools", DISALLOWED_TOOLS])
     else:
@@ -40,7 +49,7 @@ def invoke_claude(
     if effort:
         cmd.extend(["--effort", effort])
     env = {**os.environ, "PARALLAX_INSIDE_RECURSION": "1"}
-    result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+    result = subprocess.run(cmd, input=prompt, capture_output=True, text=True, env=env)
     if result.returncode == 0 and result.stdout.strip():
         return result.stdout.strip()
     return None
