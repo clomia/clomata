@@ -2,15 +2,23 @@
 
 [English](README.md) | 한국어
 
-클로드 코드의 자율성을 증폭시키는 시스템
+클로드 코드의 자율성을 증폭시키는 플러그인들
 
 ## Installation
 
-**[uv가 설치되어 있어야 합니다.](https://docs.astral.sh/uv/getting-started/installation/)**
+**[`uv` 가 설치되어 있어야 합니다.](https://docs.astral.sh/uv/getting-started/installation/)**
 
 ```
 claude plugin marketplace add clomia/claude-automata
 ```
+
+## Commands
+
+- 플러그인 설치: `claude plugin install {plugin}@claude-automata`
+- 플러그인 업데이트: `claude plugin update {plugin}@claude-automata`
+- 플러그인 활성화: `claude plugin enable {plugin}@claude-automata`
+- 플러그인 비활성화: `claude plugin disable {plugin}@claude-automata`
+- 플러그인 삭제: `claude plugin uninstall {plugin}@claude-automata`
 
 ## Plugin - parallax
 
@@ -29,10 +37,4 @@ parallax는 모델이 자발적으로 도달하기 어려운 영역에 도달할
 claude plugin install parallax@claude-automata
 ```
 
-> Update: `claude plugin update parallax@claude-automata`  
-> Uninstall: `claude plugin uninstall parallax@claude-automata`
-
-- `/parallax` — 활성화 여부 확인
-- `/parallax on` — 활성화
-- `/parallax off` — 비활성화
-- `/parallax log` — 디버깅용 로그
+`/parallax-log` 커멘드로 직전 턴의 parallax 로그를 확인할 수 있습니다.

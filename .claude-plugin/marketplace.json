@@ -11,7 +11,7 @@
     {
       "name": "parallax",
       "source": "./plugins/parallax",
-      "description": "Finds and injects directions beyond the model's narrowing focus",
+      "description": "Catches what the agent overlooks and drives complex tasks to completion",
       "version": "0.1.0",
       "author": {
         "name": "clomia",

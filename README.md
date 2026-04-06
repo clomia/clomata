@@ -2,34 +2,39 @@
 
 English | [한국어](README.ko.md)
 
-A system that amplifies Claude Code's autonomy.
+Plugins that amplify Claude Code's autonomy.
 
 ## Installation
 
-**[uv](https://docs.astral.sh/uv/getting-started/installation/) is required.**
+**[`uv` is required.](https://docs.astral.sh/uv/getting-started/installation/)**
 
 ```
 claude plugin marketplace add clomia/claude-automata
 ```
 
+## Commands
+
+- Install plugin: `claude plugin install {plugin}@claude-automata`
+- Update plugin: `claude plugin update {plugin}@claude-automata`
+- Enable plugin: `claude plugin enable {plugin}@claude-automata`
+- Disable plugin: `claude plugin disable {plugin}@claude-automata`
+- Uninstall plugin: `claude plugin uninstall {plugin}@claude-automata`
+
 ## Plugin - parallax
 
-> Intelligence booster for complex tasks
+> **Intelligence booster for complex tasks**  
+> This plugin keeps Claude Code from stopping short and drives it to finish the job.
 
-LLMs generate tokens starting from the representation space activated by their input, and as generation proceeds, prior outputs tend to constrain subsequent exploration, narrowing the exploration scope. Exploring regions the model cannot spontaneously reach therefore requires input that activates new regions.
+LLMs generate tokens starting from the representation space activated by their input, and the further generation proceeds, the more prior outputs tend to constrain subsequent exploration, narrowing the scope. To explore regions the model struggles to reach on its own, input that activates new regions is needed.
 
-This is one of the factors that cause people using Claude Code to be dissatisfied with single-turn output and iterate across multiple turns.
+This tendency is one of the factors that leave people unsatisfied with single-turn results in Claude Code and lead them to iterate across multiple turns.
 
-parallax generates and injects input that activates new regions, enabling the model to reach areas beyond its spontaneous reach — improving single-turn output quality.
+parallax generates and injects input that activates new regions, enabling the model to reach regions it struggles to reach on its own — improving single-turn result quality.
 
 ### Usage
 
 ```
 claude plugin install parallax@claude-automata
-claude plugin uninstall parallax@claude-automata # uninstall
 ```
 
-- `/parallax` — check activation status
-- `/parallax on` — enable
-- `/parallax off` — disable
-- `/parallax log` — debugging log
+Use the `/parallax-log` command to view the parallax log from the previous turn.
