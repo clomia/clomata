@@ -9,7 +9,7 @@ A system that amplifies Claude Code's autonomy.
 **[uv](https://docs.astral.sh/uv/getting-started/installation/) is required.**
 
 ```
-/plugin marketplace add clomia/claude-automata
+claude plugin marketplace add clomia/claude-automata
 ```
 
 ## Plugin - parallax
@@ -25,7 +25,8 @@ parallax generates and injects input that activates new regions, enabling the mo
 ### Usage
 
 ```
-/plugin install parallax@claude-automata
+claude plugin install parallax@claude-automata
+claude plugin uninstall parallax@claude-automata # uninstall
 ```
 
 - `/parallax` — check activation status

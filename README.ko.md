@@ -9,7 +9,7 @@
 **[uv가 설치되어 있어야 합니다.](https://docs.astral.sh/uv/getting-started/installation/)**
 
 ```
-/plugin marketplace add clomia/claude-automata
+claude plugin marketplace add clomia/claude-automata
 ```
 
 ## Plugin - parallax
@@ -25,7 +25,8 @@ parallax는 모델이 자발적으로 도달하기 어려운 영역에 도달할
 ### 사용하기
 
 ```
-/plugin install parallax@claude-automata
+claude plugin install parallax@claude-automata
+claude plugin uninstall parallax@claude-automata # 제거
 ```
 
 - `/parallax` — 활성화 여부 확인
