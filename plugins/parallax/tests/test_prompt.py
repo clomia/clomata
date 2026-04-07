@@ -1,7 +1,5 @@
 """Tests for prompt construction (pure formatting, no subprocess)."""
 
-import json
-
 from src.prompt import (
     INSTRUCTION_PROMPT,
     ROLE_PROMPT,
@@ -61,19 +59,18 @@ class TestPromptConstants:
 
 
 class TestFormatConversionPrompt:
-    def test_includes_raw_json(self):
-        actions = [{"role": "assistant", "content": "done"}]
-        prompt = format_conversion_prompt(actions)
-        assert json.dumps(actions, ensure_ascii=False, indent=2) in prompt
+    def test_includes_file_path(self):
+        prompt = format_conversion_prompt("/tmp/actions.json")
+        assert "/tmp/actions.json" in prompt
 
     def test_includes_instruction_text(self):
-        prompt = format_conversion_prompt([])
+        prompt = format_conversion_prompt("/tmp/actions.json")
         assert "Produce a markdown document" in prompt
 
-    def test_wraps_json_in_action_record_tag(self):
-        prompt = format_conversion_prompt([])
-        assert "<action-record>" in prompt
-        assert "</action-record>" in prompt
+    def test_references_file_not_inline_json(self):
+        prompt = format_conversion_prompt("/tmp/actions.json")
+        assert "Action record file:" in prompt
+        assert "<action-record>" not in prompt
 
 
 # ── build_analysis_prompt ──

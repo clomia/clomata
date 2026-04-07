@@ -4,7 +4,6 @@ Pure string formatting. Reads prompt templates from prompts/ but performs
 no subprocess calls or other I/O.
 """
 
-import json
 from pathlib import Path
 
 PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
@@ -13,15 +12,13 @@ ROLE_PROMPT = (PROMPTS_DIR / "role.md").read_text().strip()
 INSTRUCTION_PROMPT = (PROMPTS_DIR / "instruction.md").read_text().strip()
 
 CONVERSION_PROMPT_TEMPLATE = """\
-This is the main agent's task execution record.
+Read the JSON file below. This is the main agent's task execution record.
 Produce a markdown document describing this record.
 Enumerate the agent's thoughts, attempts, and results systematically, leaving nothing out.
 
-Ignore metadata outside the agent's own awareness, such as token usage or API turn counts.
+Ignore metadata outside the agent's own awareness, such as token usage, API turn counts, or signatures.
 
-<action-record>
-{actions_json}
-</action-record>"""
+Action record file: {file_path}"""
 
 
 def wrap_section(tag: str, content: str) -> str:
@@ -39,10 +36,9 @@ def format_region_history(region_history: list[str]) -> str:
     )
 
 
-def format_conversion_prompt(actions: list[dict]) -> str:
+def format_conversion_prompt(file_path: str) -> str:
     """Build the prompt string for the action-to-markdown conversion call."""
-    actions_json = json.dumps(actions, ensure_ascii=False, indent=2)
-    return CONVERSION_PROMPT_TEMPLATE.format(actions_json=actions_json)
+    return CONVERSION_PROMPT_TEMPLATE.format(file_path=file_path)
 
 
 def build_analysis_prompt(

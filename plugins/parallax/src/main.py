@@ -27,17 +27,24 @@ def invoke_claude(
     prompt: str,
     model: str | None = None,
     *,
-    allow_tools: bool = False,
+    tools: str | None = None,
     effort: str | None = None,
 ) -> str | None:
     """Run claude -p and return stdout. Returns None on failure.
 
     The prompt is piped via stdin to avoid OSError when the content exceeds
     the OS argument-list limit (ARG_MAX ~1 MB on macOS).
+
+    tools:
+      None (default) → --tools ""  (no tools)
+      "Read"         → --tools "Read"  (whitelist)
+      "*"            → --disallowedTools …  (all except dangerous)
     """
     cmd = ["claude", "-p", "--no-session-persistence"]
-    if allow_tools:
+    if tools == "*":
         cmd.extend(["--disallowedTools", DISALLOWED_TOOLS])
+    elif tools:
+        cmd.extend(["--tools", tools])
     else:
         cmd.extend(["--tools", ""])
     if model:
@@ -51,14 +58,23 @@ def invoke_claude(
     return None
 
 
-def convert_actions_to_markdown(actions: list[dict], model: str | None) -> str:
+def convert_actions_to_markdown(
+    actions: list[dict], model: str | None, data_dir: Path
+) -> str:
     """Convert agent actions to a markdown document via claude -p.
 
-    Falls back to raw JSON on failure.
+    Saves the action record to a temporary file and instructs the
+    conversion agent to read from it, avoiding input token limits
+    for large transcripts.  Falls back to raw JSON on failure.
     """
-    prompt = format_conversion_prompt(actions)
-    result = invoke_claude(prompt, model)
-    return result or json.dumps(actions, ensure_ascii=False, indent=2)
+    temp_file = data_dir / f"_conversion_{os.getpid()}.json"
+    try:
+        temp_file.write_text(json.dumps(actions, ensure_ascii=False, indent=2))
+        prompt = format_conversion_prompt(str(temp_file))
+        result = invoke_claude(prompt, model, tools="Read")
+        return result or json.dumps(actions, ensure_ascii=False, indent=2)
+    finally:
+        temp_file.unlink(missing_ok=True)
 
 
 # ── Logging ──
@@ -105,13 +121,11 @@ def run():
     log_file = state.env.data_dir / f"{state.hook.session_id}_parallax.log"
 
     action_history = convert_actions_to_markdown(
-        state.turn.agent_actions, state.turn.agent_model
+        state.turn.agent_actions, state.turn.agent_model, state.env.data_dir
     )
     mission = state.turn.user_input.replace(TRIGGER_KEYWORD, "").strip()
     prompt = build_analysis_prompt(mission, action_history, state.region_history)
-    new_region = invoke_claude(
-        prompt, state.turn.agent_model, allow_tools=True, effort="max"
-    )
+    new_region = invoke_claude(prompt, state.turn.agent_model, tools="*", effort="max")
 
     write_log(
         log_file,

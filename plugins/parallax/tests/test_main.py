@@ -80,12 +80,12 @@ class TestInvokeClaude:
             env = mock_run.call_args[1]["env"]
             assert env["PARALLAX_INSIDE_RECURSION"] == "1"
 
-    def test_disallows_tools_when_allowed(self):
+    def test_wildcard_uses_disallowed_tools(self):
         mock_result = subprocess.CompletedProcess(
             args=[], returncode=0, stdout="ok", stderr=""
         )
         with patch("src.main.subprocess.run", return_value=mock_result) as mock_run:
-            invoke_claude("test", allow_tools=True)
+            invoke_claude("test", tools="*")
             cmd = mock_run.call_args[0][0]
             assert "--disallowedTools" in cmd
             assert "--tools" not in cmd
@@ -96,6 +96,27 @@ class TestInvokeClaude:
         )
         with patch("src.main.subprocess.run", return_value=mock_result) as mock_run:
             invoke_claude("test")
+            cmd = mock_run.call_args[0][0]
+            idx = cmd.index("--tools")
+            assert cmd[idx + 1] == ""
+
+    def test_uses_explicit_tools_whitelist(self):
+        mock_result = subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="ok", stderr=""
+        )
+        with patch("src.main.subprocess.run", return_value=mock_result) as mock_run:
+            invoke_claude("test", tools="Read")
+            cmd = mock_run.call_args[0][0]
+            idx = cmd.index("--tools")
+            assert cmd[idx + 1] == "Read"
+            assert "--disallowedTools" not in cmd
+
+    def test_empty_string_disables_all_tools(self):
+        mock_result = subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="ok", stderr=""
+        )
+        with patch("src.main.subprocess.run", return_value=mock_result) as mock_run:
+            invoke_claude("test", tools="")
             cmd = mock_run.call_args[0][0]
             idx = cmd.index("--tools")
             assert cmd[idx + 1] == ""
@@ -112,25 +133,47 @@ class TestInvokeClaude:
 
 
 class TestConvertActionsToMarkdown:
-    def test_passes_raw_json_to_claude(self):
+    def test_writes_temp_file_and_passes_path_to_claude(self, tmp_path):
         actions = [{"role": "assistant", "content": "done"}]
         mock_result = subprocess.CompletedProcess(
             args=[], returncode=0, stdout="# Actions\n\nThe agent responded.", stderr=""
         )
         with patch("src.main.subprocess.run", return_value=mock_result) as mock_run:
-            result = convert_actions_to_markdown(actions, "claude-opus-4-6")
+            result = convert_actions_to_markdown(actions, "claude-opus-4-6", tmp_path)
             assert result == "# Actions\n\nThe agent responded."
             stdin_prompt = mock_run.call_args[1]["input"]
-            assert json.dumps(actions, ensure_ascii=False, indent=2) in stdin_prompt
+            assert "Action record file:" in stdin_prompt
+            assert str(tmp_path) in stdin_prompt
+            cmd = mock_run.call_args[0][0]
+            idx = cmd.index("--tools")
+            assert cmd[idx + 1] == "Read"
 
-    def test_falls_back_to_raw_json_on_failure(self):
+    def test_falls_back_to_raw_json_on_failure(self, tmp_path):
         actions = [{"role": "assistant", "content": "hello"}]
         mock_result = subprocess.CompletedProcess(
             args=[], returncode=1, stdout="", stderr="error"
         )
         with patch("src.main.subprocess.run", return_value=mock_result):
-            result = convert_actions_to_markdown(actions, None)
+            result = convert_actions_to_markdown(actions, None, tmp_path)
             assert result == json.dumps(actions, ensure_ascii=False, indent=2)
+
+    def test_cleans_up_temp_file(self, tmp_path):
+        actions = [{"role": "assistant", "content": "done"}]
+        mock_result = subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="ok", stderr=""
+        )
+        with patch("src.main.subprocess.run", return_value=mock_result):
+            convert_actions_to_markdown(actions, None, tmp_path)
+        temp_files = list(tmp_path.glob("_conversion_*.json"))
+        assert temp_files == []
+
+    def test_cleans_up_temp_file_on_failure(self, tmp_path):
+        actions = [{"role": "assistant", "content": "done"}]
+        with patch("src.main.subprocess.run", side_effect=OSError("spawn failed")):
+            with pytest.raises(OSError):
+                convert_actions_to_markdown(actions, None, tmp_path)
+        temp_files = list(tmp_path.glob("_conversion_*.json"))
+        assert temp_files == []
 
 
 # ── capture_user_prompt ──
