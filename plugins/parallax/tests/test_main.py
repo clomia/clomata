@@ -109,6 +109,8 @@ class TestInvokeClaude:
             cmd = mock_run.call_args[0][0]
             idx = cmd.index("--tools")
             assert cmd[idx + 1] == "Read"
+            allowed_idx = cmd.index("--allowedTools")
+            assert cmd[allowed_idx + 1] == "Read"
             assert "--disallowedTools" not in cmd
 
     def test_empty_string_disables_all_tools(self):

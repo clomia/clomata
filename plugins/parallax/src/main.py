@@ -37,14 +37,14 @@ def invoke_claude(
 
     tools:
       None (default) → --tools ""  (no tools)
-      "Read"         → --tools "Read"  (whitelist)
+      "Read"         → --tools "Read" --allowedTools "Read"  (whitelist + auto-approve)
       "*"            → --disallowedTools …  (all except dangerous)
     """
     cmd = ["claude", "-p", "--no-session-persistence"]
     if tools == "*":
         cmd.extend(["--disallowedTools", DISALLOWED_TOOLS])
     elif tools:
-        cmd.extend(["--tools", tools])
+        cmd.extend(["--tools", tools, "--allowedTools", tools])
     else:
         cmd.extend(["--tools", ""])
     if model:
