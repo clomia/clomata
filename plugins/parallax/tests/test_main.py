@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from src.main import (
+    TRIGGER_KEYWORD,
     capture_user_prompt,
     convert_actions_to_markdown,
     invoke_claude,
@@ -164,6 +165,53 @@ class TestCaptureUserPrompt:
         written = (tmp_path / "sess1_last_user_prompt.txt").read_text()
         assert written == ""
 
+    def test_creates_activation_file_when_keyword_present(self, tmp_path, monkeypatch):
+        stdin_data = json.dumps(
+            {
+                "session_id": "sess1",
+                "prompt": f"{TRIGGER_KEYWORD} implement auth system",
+                "hook_event_name": "UserPromptSubmit",
+            }
+        )
+        monkeypatch.setenv("CLAUDE_PLUGIN_DATA", str(tmp_path))
+        monkeypatch.setattr("sys.stdin", io.StringIO(stdin_data))
+
+        capture_user_prompt()
+
+        assert (tmp_path / "sess1_active").exists()
+
+    def test_no_activation_file_when_keyword_absent(self, tmp_path, monkeypatch):
+        stdin_data = json.dumps(
+            {
+                "session_id": "sess1",
+                "prompt": "fix the login bug",
+                "hook_event_name": "UserPromptSubmit",
+            }
+        )
+        monkeypatch.setenv("CLAUDE_PLUGIN_DATA", str(tmp_path))
+        monkeypatch.setattr("sys.stdin", io.StringIO(stdin_data))
+
+        capture_user_prompt()
+
+        assert not (tmp_path / "sess1_active").exists()
+
+    def test_removes_stale_activation_file(self, tmp_path, monkeypatch):
+        (tmp_path / "sess1_active").touch()
+
+        stdin_data = json.dumps(
+            {
+                "session_id": "sess1",
+                "prompt": "simple fix",
+                "hook_event_name": "UserPromptSubmit",
+            }
+        )
+        monkeypatch.setenv("CLAUDE_PLUGIN_DATA", str(tmp_path))
+        monkeypatch.setattr("sys.stdin", io.StringIO(stdin_data))
+
+        capture_user_prompt()
+
+        assert not (tmp_path / "sess1_active").exists()
+
 
 # ── write_log ──
 
@@ -198,7 +246,9 @@ class TestWriteLog:
 
 
 class TestRun:
-    def _make_state(self, tmp_path, *, user_input="fix bug", **overrides):
+    def _make_state(
+        self, tmp_path, *, user_input="fix bug", activated=True, **overrides
+    ):
         defaults = dict(
             is_inside_recursion=False,
             stop_hook_active=False,
@@ -207,6 +257,11 @@ class TestRun:
             region_history=[],
         )
         defaults.update(overrides)
+        activation_file = tmp_path / "s1_active"
+        if activated:
+            activation_file.touch()
+        elif activation_file.exists():
+            activation_file.unlink()
         return State(
             hook=HookInput(
                 stop_hook_active=defaults["stop_hook_active"],
@@ -324,6 +379,43 @@ class TestRun:
         assert exc.value.code == 2
         mock_stderr.write.assert_called_once_with("Add error handling")
         mock_finish.assert_called_once_with(state, "Add error handling")
+
+    @pytest.mark.parametrize(
+        "user_input, expected_mission",
+        [
+            (f"{TRIGGER_KEYWORD} implement auth", "implement auth"),
+            (f"refactor {TRIGGER_KEYWORD} module", "refactor  module"),
+            (f"build feature {TRIGGER_KEYWORD}", "build feature"),
+            ("fix bug", "fix bug"),
+        ],
+    )
+    def test_strips_trigger_keyword_from_mission(
+        self, tmp_path, user_input, expected_mission
+    ):
+        state = self._make_state(tmp_path, user_input=user_input)
+        with (
+            patch("src.main.build_state", return_value=state),
+            patch("sys.stdin", io.StringIO("")),
+            patch("src.main.save_initial_turn"),
+            patch("src.main.convert_actions_to_markdown", return_value="md"),
+            patch(
+                "src.main.build_analysis_prompt", return_value="prompt"
+            ) as mock_prompt,
+            patch("src.main.invoke_claude", return_value=None),
+            pytest.raises(SystemExit),
+        ):
+            run()
+        mock_prompt.assert_called_once_with(expected_mission, "md", [])
+
+    def test_exits_when_not_activated(self, tmp_path):
+        state = self._make_state(tmp_path, activated=False)
+        with (
+            patch("src.main.build_state", return_value=state),
+            patch("sys.stdin", io.StringIO("")),
+            pytest.raises(SystemExit) as exc,
+        ):
+            run()
+        assert exc.value.code == 0
 
     @pytest.mark.parametrize(
         "user_input",

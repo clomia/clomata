@@ -19,6 +19,7 @@ from src.state import ROUND_LIMIT, build_state, finish_round, save_initial_turn
 # ── claude -p invocation ──
 
 
+TRIGGER_KEYWORD = "parallaxthink"
 DISALLOWED_TOOLS = "Bash,Write,Edit,NotebookEdit"
 
 
@@ -86,6 +87,10 @@ def run():
     if state.env.is_inside_recursion:
         sys.exit(0)
 
+    activation_file = state.env.data_dir / f"{state.hook.session_id}_active"
+    if not activation_file.exists():
+        sys.exit(0)
+
     # Skip analysis when the user prompt is a /parallax-log skill command
     if state.turn.user_input.lstrip().startswith("/parallax-log"):
         sys.exit(0)
@@ -102,9 +107,8 @@ def run():
     action_history = convert_actions_to_markdown(
         state.turn.agent_actions, state.turn.agent_model
     )
-    prompt = build_analysis_prompt(
-        state.turn.user_input, action_history, state.region_history
-    )
+    mission = state.turn.user_input.replace(TRIGGER_KEYWORD, "").strip()
+    prompt = build_analysis_prompt(mission, action_history, state.region_history)
     new_region = invoke_claude(
         prompt, state.turn.agent_model, allow_tools=True, effort="max"
     )
@@ -131,13 +135,23 @@ def capture_user_prompt():
     Persists the raw user input to a file that the Stop hook reads later.
     This guarantees original-mission contains exactly what the user typed,
     regardless of skill expansions or system message injections.
+
+    Also manages the activation marker: parallax only runs when the user
+    prompt contains the trigger keyword.
     """
     data = json.loads(sys.stdin.read())
-    prompt_file = (
-        Path(os.environ["CLAUDE_PLUGIN_DATA"])
-        / f"{data['session_id']}_last_user_prompt.txt"
-    )
-    prompt_file.write_text(data.get("prompt", ""))
+    data_dir = Path(os.environ["CLAUDE_PLUGIN_DATA"])
+    session_id = data["session_id"]
+    prompt = data.get("prompt", "")
+
+    prompt_file = data_dir / f"{session_id}_last_user_prompt.txt"
+    prompt_file.write_text(prompt)
+
+    activation_file = data_dir / f"{session_id}_active"
+    if TRIGGER_KEYWORD in prompt:
+        activation_file.touch()
+    elif activation_file.exists():
+        activation_file.unlink()
 
 
 if __name__ == "__main__":
