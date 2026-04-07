@@ -22,7 +22,7 @@ claude plugin marketplace add clomia/claude-automata
 - Disable plugin: `claude plugin disable {plugin}@claude-automata`
 - Uninstall plugin: `claude plugin uninstall {plugin}@claude-automata`
 
-## Plugin - parallax
+# Parallax
 
 > **Intelligence booster for complex tasks**  
 > This plugin keeps Claude Code from stopping short and drives it to finish the job.
@@ -33,15 +33,16 @@ This tendency is one of the factors that leave people unsatisfied with single-tu
 
 parallax generates and injects input that activates new regions, enabling the model to reach regions it struggles to reach on its own — improving single-turn result quality.
 
+### Installation
+
+```
+claude plugin install parallax@claude-automata
+```
+
 ### Usage
 
-- Install the plugin and give Claude Code large, complex tasks.
-  ```
-  claude plugin install parallax@claude-automata
-  ```
-- Use it only for important tasks and disable it in everyday situations.
-  ```
-  claude plugin disable parallax@claude-automata # disable
-  claude plugin enable parallax@claude-automata  # enable
-  ```
-- Use the `/parallax-log` command to view the parallax log after Claude finishes its work.
+**Automatically activates when the prompt contains the `parallaxthink` keyword.**
+
+> Example: Make a tic-tac-toe game in HTML. parallaxthink
+
+Use the `/parallax-log` command to view the most recent parallax log.

@@ -14,7 +14,7 @@ claude plugin marketplace add clomia/claude-automata
 
 ## Commands
 
-> 로컬 스코프에서 사용하려면 커멘드에 `--scope local` 옵션을 추가하세요.
+> 커멘드에 `--scope local` 옵션을 추가하면 로컬 스코프로 동작합니다.
 
 - 플러그인 설치: `claude plugin install {plugin}@claude-automata`
 - 플러그인 업데이트: `claude plugin update {plugin}@claude-automata`
@@ -22,7 +22,7 @@ claude plugin marketplace add clomia/claude-automata
 - 플러그인 비활성화: `claude plugin disable {plugin}@claude-automata`
 - 플러그인 삭제: `claude plugin uninstall {plugin}@claude-automata`
 
-## Plugin - parallax
+# Parallax
 
 > **복잡한 작업을 위한 지능 부스터**  
 > 이 플러그인은 클로드 코드가 멈추지 않고 완벽히 끝내도록 만듭니다.
@@ -33,15 +33,16 @@ LLM은 입력이 활성화한 representation space를 기점으로 토큰을 생
 
 parallax는 모델이 자발적으로 도달하기 어려운 영역에 도달할 수 있도록 새로운 영역을 활성화 하는 입력을 생성하고 주입해서 단일 턴의 결과 품질을 높입니다.
 
+### Installation
+
+```
+claude plugin install parallax@claude-automata
+```
+
 ### Usage
 
-- 플러그인을 설치하고 클로드 코드에게 크고 복잡한 작업을 요청하세요.
-  ```
-  claude plugin install parallax@claude-automata
-  ```
-- 중요한 작업에만 사용하고 일반적인 상황에서는 비활성화 하세요.
-  ```
-  claude plugin disable parallax@claude-automata # 비활성화
-  claude plugin enable parallax@claude-automata # 활성화
-  ```
-- 클로드가 작업을 완료한 후 `/parallax-log` 커멘드로 로그를 확인할 수 있습니다.
+**프롬프트에 `parallaxthink` 키워드가 있으면 자동으로 활성화됩니다.**
+
+> 예시: HTML로 틱택토 게임 만들어줘. parallaxthink
+
+`/parallax-log` 커멘드로 직전에 실행된 로그를 확인할 수 있습니다.
