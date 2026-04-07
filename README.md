@@ -40,7 +40,13 @@ Use the `/parallax-log` command to view the most recent parallax log.
 > To use in local scope, add the `--scope local` option to the command.
 
 - Install plugin: `claude plugin install {plugin}@claude-automata`
-- Update plugin: `claude plugin update {plugin}@claude-automata`
+- Uninstall plugin: `claude plugin uninstall {plugin}@claude-automata`
 - Enable plugin: `claude plugin enable {plugin}@claude-automata`
 - Disable plugin: `claude plugin disable {plugin}@claude-automata`
-- Uninstall plugin: `claude plugin uninstall {plugin}@claude-automata`
+
+### Updating plugins to the latest version
+
+```
+claude plugin marketplace update claude-automata
+claude plugin update {plugin}@claude-automata
+```
