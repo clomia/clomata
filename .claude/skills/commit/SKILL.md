@@ -19,7 +19,7 @@ argument-hint: "[push]"
 
 # push 수행 전 버전 수정하기 (중요)
 
-플러그인 소스가 변경된 경우 @.claude-plugin/marketplace.json 에서 해당 플러그인의 버전을 한단계 올려야 합니다.
+플러그인 소스가 변경된 경우 `.claude-plugin/marketplace.json`, `해당 프로젝트의 pyproject.toml` 양쪽에서 해당 플러그인의 버전을 한단계 올려야 합니다.
 버전을 변경하지 않으면 다른 사용자의 update가 작동하지 않으므로 수정사항 push 전, 반드시 버전을 변경하세요.
 
-또한, 해당 플러그인의 pyproject.toml 에서 project의 version도 동일하게 맞춰야 합니다.
+양쪽 파일에서 버저닝은 동일해야 합니다.
