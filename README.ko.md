@@ -31,10 +31,15 @@ LLM은 입력이 활성화한 representation space를 기점으로 토큰을 생
 
 parallax는 모델이 자발적으로 도달하기 어려운 영역에 도달할 수 있도록 새로운 영역을 활성화 하는 입력을 생성하고 주입해서 단일 턴의 결과 품질을 높입니다.
 
-### 사용하기
+### Usage
 
-```
-claude plugin install parallax@claude-automata
-```
-
-`/parallax-log` 커멘드로 직전 턴의 parallax 로그를 확인할 수 있습니다.
+- 플러그인을 설치하고 클로드 코드에게 크고 복잡한 작업을 요청하세요.
+  ```
+  claude plugin install parallax@claude-automata
+  ```
+- 중요한 작업에만 사용하고 일반적인 상황에서는 비활성화 하세요.
+  ```
+  claude plugin disable parallax@claude-automata # 비활성화
+  claude plugin enable parallax@claude-automata # 활성화
+  ```
+- 클로드가 작업을 완료한 후 `/parallax-log` 커멘드로 로그를 확인할 수 있습니다.

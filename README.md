@@ -33,8 +33,13 @@ parallax generates and injects input that activates new regions, enabling the mo
 
 ### Usage
 
-```
-claude plugin install parallax@claude-automata
-```
-
-Use the `/parallax-log` command to view the parallax log from the previous turn.
+- Install the plugin and give Claude Code large, complex tasks.
+  ```
+  claude plugin install parallax@claude-automata
+  ```
+- Use it only for important tasks and disable it in everyday situations.
+  ```
+  claude plugin disable parallax@claude-automata # disable
+  claude plugin enable parallax@claude-automata  # enable
+  ```
+- Use the `/parallax-log` command to view the parallax log after Claude finishes its work.
