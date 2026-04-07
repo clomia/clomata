@@ -6,6 +6,10 @@ model: haiku
 
 `/parallax-log`
 
+## Context
+
+parallax is an advisory agent that surfaces regions the main agent has not considered. It analyzes the main agent's work after each stop and, if unconsidered regions remain, injects a new region to prompt further work. Each injection is a "round." This repeats until no more unconsidered regions are found.
+
 ## Behavior
 
 Read the log file at `${CLAUDE_PLUGIN_DATA}/${CLAUDE_SESSION_ID}_parallax.log`.
