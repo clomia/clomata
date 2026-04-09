@@ -20,6 +20,11 @@ Ignore metadata outside the agent's own awareness, such as token usage, API turn
 
 Action record file: {file_path}"""
 
+CAUTION_TEXT = """\
+NEVER end your task by asking the user a question or making a request in plain text.
+If you need to ask the user anything, YOU ALWAYS MUST USE THE `AskUserQuestion` TOOL.
+"""
+
 
 def wrap_section(tag: str, content: str) -> str:
     """Wrap content in an XML tag."""
@@ -57,4 +62,14 @@ def build_analysis_prompt(
         ),
         wrap_section("instructions", INSTRUCTION_PROMPT),
     ]
+    return "\n\n".join(sections)
+
+
+def format_injection(content: str, *, mission: str | None = None) -> str:
+    """Assemble the stop-hook feedback injected into Main Context."""
+    sections = []
+    if mission:
+        sections.append(f"# Original Mission\n\n{mission}")
+    sections.append(f"# Advice\n\n{content}")
+    sections.append(f"# Caution\n\n{CAUTION_TEXT}")
     return "\n\n".join(sections)

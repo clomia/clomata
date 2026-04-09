@@ -31,7 +31,6 @@ def write_jsonl(path: Path, messages: list[dict]):
 def make_stdin(
     *,
     stop_hook_active=False,
-    last_assistant_message="",
     session_id="sess1",
     transcript_path="",
     **extra,
@@ -39,7 +38,6 @@ def make_stdin(
     return json.dumps(
         {
             "stop_hook_active": stop_hook_active,
-            "last_assistant_message": last_assistant_message,
             "session_id": session_id,
             "transcript_path": transcript_path,
             **extra,
@@ -54,13 +52,11 @@ class TestHookInput:
     def test_parse_from_json(self):
         raw = make_stdin(
             stop_hook_active=True,
-            last_assistant_message="Done",
             session_id="abc123",
             transcript_path="/tmp/t.jsonl",
         )
         hook = HookInput.model_validate_json(raw)
         assert hook.stop_hook_active is True
-        assert hook.last_assistant_message == "Done"
         assert hook.session_id == "abc123"
 
     def test_ignores_extra_fields(self):
@@ -143,7 +139,6 @@ class TestFinishRound:
         state = State(
             hook=HookInput(
                 stop_hook_active=False,
-                last_assistant_message="",
                 session_id="sess1",
                 transcript_path="",
             ),
@@ -169,7 +164,6 @@ class TestFinishRound:
         state = State(
             hook=HookInput(
                 stop_hook_active=True,
-                last_assistant_message="",
                 session_id="sess1",
                 transcript_path="",
             ),
@@ -730,6 +724,7 @@ class TestBuildStateRound1:
             )
         )
 
+        assert state.compacted is False
         assert state.current_round == 0
         assert state.turn.user_input == "new task"
         save_initial_turn(state)
@@ -782,6 +777,7 @@ class TestBuildStateRound1:
         )
 
         assert state.continuing is True
+        assert state.compacted is True
         assert state.current_round == 3
         assert len(state.region_history) == 3
         assert state.turn.user_input == "build feature"
@@ -829,6 +825,7 @@ class TestBuildStateRound2:
             )
         )
 
+        assert state.compacted is False
         assert state.turn.user_input == "fix the bug"
         assert state.current_round == 1
         assert state.region_history == ["Add error handling"]

@@ -15,6 +15,7 @@ from src.main import (
     run,
     write_log,
 )
+from src.prompt import format_injection
 from src.state import ROUND_LIMIT, HookInput, PluginEnvironment, State, Turn
 
 
@@ -298,6 +299,7 @@ class TestRun:
             is_inside_recursion=False,
             stop_hook_active=False,
             continuing=False,
+            compacted=False,
             current_round=0,
             region_history=[],
         )
@@ -310,7 +312,6 @@ class TestRun:
         return State(
             hook=HookInput(
                 stop_hook_active=defaults["stop_hook_active"],
-                last_assistant_message="done",
                 session_id="s1",
                 transcript_path=str(tmp_path / "t.jsonl"),
             ),
@@ -319,6 +320,7 @@ class TestRun:
                 is_inside_recursion=defaults["is_inside_recursion"],
             ),
             continuing=defaults["continuing"],
+            compacted=defaults["compacted"],
             current_round=defaults["current_round"],
             region_history=defaults["region_history"],
             turn=Turn(
@@ -422,14 +424,35 @@ class TestRun:
         ):
             run()
         assert exc.value.code == 2
-        mock_stderr.write.assert_called_once_with("Add error handling")
         mock_finish.assert_called_once_with(state, "Add error handling")
+        mock_stderr.write.assert_called_once_with(
+            format_injection("Add error handling")
+        )
+
+    def test_injects_region_with_mission_on_compaction(self, tmp_path):
+        state = self._make_state(tmp_path, compacted=True)
+        with (
+            patch("src.main.build_state", return_value=state),
+            patch("sys.stdin", io.StringIO("")),
+            patch("src.main.save_initial_turn"),
+            patch("src.main.convert_actions_to_markdown", return_value="md"),
+            patch("src.main.invoke_claude", return_value="Add error handling"),
+            patch("src.main.finish_round") as mock_finish,
+            patch("sys.stderr") as mock_stderr,
+            pytest.raises(SystemExit) as exc,
+        ):
+            run()
+        assert exc.value.code == 2
+        mock_finish.assert_called_once_with(state, "Add error handling")
+        mock_stderr.write.assert_called_once_with(
+            format_injection("Add error handling", mission="fix bug")
+        )
 
     @pytest.mark.parametrize(
         "user_input, expected_mission",
         [
             (f"{TRIGGER_KEYWORD} implement auth", "implement auth"),
-            (f"refactor {TRIGGER_KEYWORD} module", "refactor  module"),
+            (f"refactor {TRIGGER_KEYWORD} module", "refactor module"),
             (f"build feature {TRIGGER_KEYWORD}", "build feature"),
             ("fix bug", "fix bug"),
         ],

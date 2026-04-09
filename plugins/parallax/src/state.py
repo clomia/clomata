@@ -22,7 +22,6 @@ class HookInput(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     stop_hook_active: bool
-    last_assistant_message: str
     session_id: str
     transcript_path: str
 
@@ -51,6 +50,7 @@ class State(BaseModel):
     hook: HookInput
     env: PluginEnvironment
     continuing: bool = False
+    compacted: bool = False
     current_round: int = 0
     region_history: list[str] = []
     turn: Turn
@@ -200,6 +200,7 @@ def build_state(stdin_raw: str) -> State:
     # (set by finish_round during the turn).  If the state file is
     # newer, no new turn actually started — compaction happened.
     continuing = hook.stop_hook_active
+    compacted = False
     if not continuing and turn_state.get("round", 0) > 0:
         try:
             prompt_mtime = prompt_file.stat().st_mtime if prompt_file.exists() else 0
@@ -208,6 +209,7 @@ def build_state(stdin_raw: str) -> State:
             prompt_mtime = state_mtime = 0
         if state_mtime > prompt_mtime:
             continuing = True
+            compacted = True
 
     if continuing:
         current_round = turn_state.get("round", 0)
@@ -234,6 +236,7 @@ def build_state(stdin_raw: str) -> State:
         hook=hook,
         env=env,
         continuing=continuing,
+        compacted=compacted,
         current_round=current_round,
         region_history=region_history,
         turn=turn,

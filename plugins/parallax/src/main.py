@@ -13,7 +13,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from src.prompt import build_analysis_prompt, format_conversion_prompt
+from src.prompt import build_analysis_prompt, format_conversion_prompt, format_injection
 from src.state import ROUND_LIMIT, build_state, finish_round, save_initial_turn
 
 # ── claude -p invocation ──
@@ -123,7 +123,7 @@ def run():
     action_history = convert_actions_to_markdown(
         state.turn.agent_actions, state.turn.agent_model, state.env.data_dir
     )
-    mission = state.turn.user_input.replace(TRIGGER_KEYWORD, "").strip()
+    mission = " ".join(state.turn.user_input.replace(TRIGGER_KEYWORD, "").split())
     prompt = build_analysis_prompt(mission, action_history, state.region_history)
     new_region = invoke_claude(prompt, state.turn.agent_model, tools="*", effort="max")
 
@@ -139,7 +139,8 @@ def run():
         sys.exit(0)
 
     finish_round(state, new_region)
-    sys.stderr.write(new_region)
+    output = format_injection(new_region, mission=mission if state.compacted else None)
+    sys.stderr.write(output)
     sys.exit(2)
 
 
