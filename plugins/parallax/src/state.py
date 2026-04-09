@@ -147,6 +147,8 @@ def save_initial_turn(state: "State") -> None:
     save_turn_state(
         path, {"round": 0, "user_input": state.turn.user_input, "regions": []}
     )
+    # Clean up stale compaction marker from previous turn
+    (state.env.data_dir / f"{state.hook.session_id}_compacted").unlink(missing_ok=True)
 
 
 def finish_round(state: "State", new_region: str) -> None:
@@ -174,8 +176,8 @@ def build_state(stdin_raw: str) -> State:
       exactly what the user typed, free of skill expansions or system
       injections.
     - Continuing turn (continuing=True): Loaded from persisted state file.
-      Note: stop_hook_active can revert to False after auto-compaction,
-      so continuing is determined by mtime comparison, not the flag alone.
+      Compaction is detected via a marker file created by the PostCompact
+      hook, independent of stop_hook_active.
 
     agent_actions always comes from parse_turn, which naturally scopes to
     work done since the last feedback injection.
@@ -193,23 +195,9 @@ def build_state(stdin_raw: str) -> State:
     turn_state = load_turn_state(state_file)
     turn = parse_turn(hook.transcript_path)
 
-    # stop_hook_active reverts to False after auto-compaction because
-    # Claude Code fires SessionStart(compact), resetting the flag.
-    # Detect this by comparing the prompt file mtime (set once by
-    # UserPromptSubmit at turn start) with the state file mtime
-    # (set by finish_round during the turn).  If the state file is
-    # newer, no new turn actually started — compaction happened.
-    continuing = hook.stop_hook_active
-    compacted = False
-    if not continuing and turn_state.get("round", 0) > 0:
-        try:
-            prompt_mtime = prompt_file.stat().st_mtime if prompt_file.exists() else 0
-            state_mtime = state_file.stat().st_mtime if state_file.exists() else 0
-        except OSError:
-            prompt_mtime = state_mtime = 0
-        if state_mtime > prompt_mtime:
-            continuing = True
-            compacted = True
+    compaction_marker = env.data_dir / f"{hook.session_id}_compacted"
+    compacted = compaction_marker.exists()
+    continuing = hook.stop_hook_active or compacted
 
     if continuing:
         current_round = turn_state.get("round", 0)

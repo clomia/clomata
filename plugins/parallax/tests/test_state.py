@@ -1,7 +1,6 @@
 """Tests for the state module."""
 
 import json
-import os
 from pathlib import Path
 
 from src.state import (
@@ -689,10 +688,8 @@ class TestBuildStateRound1:
         assert "This session is being continued" in saved["user_input"]
 
     def test_new_turn_overwrites_previous_state_file(self, tmp_path, monkeypatch):
-        """When a new turn starts (stop_hook_active=False), save_initial_turn
-        overwrites the stale state file from the previous turn.
-        A real new turn means UserPromptSubmit fired, so the prompt file
-        is newer than the stale state file."""
+        """When a new turn starts (stop_hook_active=False, no compaction
+        marker), save_initial_turn overwrites the stale state file."""
         t = tmp_path / "transcript.jsonl"
         write_jsonl(
             t,
@@ -703,15 +700,11 @@ class TestBuildStateRound1:
         )
         data_dir = tmp_path / "data"
         data_dir.mkdir()
-        # Stale state file from previous turn (mtime = 1000)
-        state_path = data_dir / "s1.json"
-        save_turn_state(state_path, {"round": 5, "user_input": "old task"})
-        os.utime(state_path, (1000, 1000))
+        # Stale state file from previous turn — no compaction marker
+        save_turn_state(data_dir / "s1.json", {"round": 5, "user_input": "old task"})
 
-        # Prompt file from new turn (mtime = 2000, strictly newer)
         prompt_path = data_dir / "s1_last_user_prompt.txt"
         prompt_path.write_text("new task")
-        os.utime(prompt_path, (2000, 2000))
 
         monkeypatch.setenv("CLAUDE_PLUGIN_DATA", str(data_dir))
         monkeypatch.delenv("PARALLAX_INSIDE_RECURSION", raising=False)
@@ -725,6 +718,7 @@ class TestBuildStateRound1:
         )
 
         assert state.compacted is False
+        assert state.continuing is False
         assert state.current_round == 0
         assert state.turn.user_input == "new task"
         save_initial_turn(state)
@@ -733,10 +727,8 @@ class TestBuildStateRound1:
         assert saved["round"] == 0
 
     def test_auto_compaction_preserves_round(self, tmp_path, monkeypatch):
-        """After auto-compaction stop_hook_active reverts to False, but the
-        state file (updated by finish_round) is newer than the prompt file
-        (written once at turn start).  build_state must detect this and
-        keep the existing round instead of resetting to 0."""
+        """PostCompact marker signals compaction. build_state must detect it
+        and keep the existing round instead of resetting to 0."""
         t = tmp_path / "transcript.jsonl"
         write_jsonl(
             t,
@@ -748,22 +740,17 @@ class TestBuildStateRound1:
         data_dir = tmp_path / "data"
         data_dir.mkdir()
 
-        # Prompt file written at turn start (mtime = 1000)
-        prompt_path = data_dir / "s1_last_user_prompt.txt"
-        prompt_path.write_text("build feature")
-        os.utime(prompt_path, (1000, 1000))
-
-        # State file written by finish_round (mtime = 2000, strictly newer)
-        state_path = data_dir / "s1.json"
         save_turn_state(
-            state_path,
+            data_dir / "s1.json",
             {
                 "round": 3,
                 "user_input": "build feature",
                 "regions": ["d1", "d2", "d3"],
             },
         )
-        os.utime(state_path, (2000, 2000))
+
+        # PostCompact marker (replaces mtime comparison)
+        (data_dir / "s1_compacted").touch()
 
         monkeypatch.setenv("CLAUDE_PLUGIN_DATA", str(data_dir))
         monkeypatch.delenv("PARALLAX_INSIDE_RECURSION", raising=False)
@@ -781,6 +768,71 @@ class TestBuildStateRound1:
         assert state.current_round == 3
         assert len(state.region_history) == 3
         assert state.turn.user_input == "build feature"
+
+    def test_no_compaction_without_marker(self, tmp_path, monkeypatch):
+        """Without PostCompact marker, compacted is False even when
+        stop_hook_active is False and state file exists with round > 0."""
+        t = tmp_path / "transcript.jsonl"
+        write_jsonl(
+            t,
+            [
+                {"role": "user", "content": "new task"},
+                {"role": "assistant", "content": "done"},
+            ],
+        )
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        save_turn_state(
+            data_dir / "s1.json",
+            {"round": 3, "user_input": "old task", "regions": ["a", "b", "c"]},
+        )
+        prompt_path = data_dir / "s1_last_user_prompt.txt"
+        prompt_path.write_text("new task")
+
+        monkeypatch.setenv("CLAUDE_PLUGIN_DATA", str(data_dir))
+        monkeypatch.delenv("PARALLAX_INSIDE_RECURSION", raising=False)
+
+        state = build_state(
+            make_stdin(
+                stop_hook_active=False,
+                session_id="s1",
+                transcript_path=str(t),
+            )
+        )
+
+        assert state.compacted is False
+        assert state.continuing is False
+        assert state.current_round == 0
+        assert state.turn.user_input == "new task"
+
+    def test_save_initial_turn_cleans_stale_marker(self, tmp_path, monkeypatch):
+        """save_initial_turn removes any leftover compaction marker."""
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        marker = data_dir / "s1_compacted"
+        marker.touch()
+
+        monkeypatch.setenv("CLAUDE_PLUGIN_DATA", str(data_dir))
+        monkeypatch.delenv("PARALLAX_INSIDE_RECURSION", raising=False)
+
+        t = tmp_path / "transcript.jsonl"
+        write_jsonl(t, [{"role": "user", "content": "task"}])
+
+        state = build_state(
+            make_stdin(
+                stop_hook_active=False,
+                session_id="s1",
+                transcript_path=str(t),
+            )
+        )
+        # Marker is detected → compacted=True, continuing=True
+        assert state.compacted is True
+
+        # But if this were a new turn, save_initial_turn cleans the marker
+        # Simulate: force new_turn by building a non-continuing state
+        state.continuing = False
+        save_initial_turn(state)
+        assert not marker.exists()
 
 
 # ── build_state: round 2+ (stop_hook_active=True) ──
@@ -938,8 +990,8 @@ class TestBuildStateRound2:
         assert state.turn.agent_actions[0]["content"] == "Edge cases handled."
 
     def test_compaction_mid_loop(self, tmp_path, monkeypatch):
-        """If compaction rewrites the transcript mid-loop, user_input comes from
-        the state file and agent_actions degrades to post-compaction work."""
+        """If compaction rewrites the transcript mid-loop while stop_hook_active
+        remains True, the PostCompact marker still signals compaction."""
         t = tmp_path / "transcript.jsonl"
         write_jsonl(
             t,
@@ -963,6 +1015,9 @@ class TestBuildStateRound2:
             },
         )
 
+        # PostCompact marker
+        (data_dir / "s1_compacted").touch()
+
         monkeypatch.setenv("CLAUDE_PLUGIN_DATA", str(data_dir))
         monkeypatch.delenv("PARALLAX_INSIDE_RECURSION", raising=False)
 
@@ -974,6 +1029,7 @@ class TestBuildStateRound2:
             )
         )
 
+        assert state.compacted is True
         assert state.turn.user_input == "fix the bug"
         assert len(state.turn.agent_actions) == 1
 

@@ -8,6 +8,7 @@ On each LLM stop:
 
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -111,6 +112,11 @@ def run():
     if state.turn.user_input.lstrip().startswith("/parallax-log"):
         sys.exit(0)
 
+    # Consume compaction marker — must happen after early-exit guards
+    # so recursive calls and non-parallax commands don't consume it
+    if state.compacted:
+        (state.env.data_dir / f"{state.hook.session_id}_compacted").unlink(missing_ok=True)
+
     new_turn = not state.continuing
     if new_turn:
         save_initial_turn(state)
@@ -123,7 +129,7 @@ def run():
     action_history = convert_actions_to_markdown(
         state.turn.agent_actions, state.turn.agent_model, state.env.data_dir
     )
-    mission = " ".join(state.turn.user_input.replace(TRIGGER_KEYWORD, "").split())
+    mission = re.sub(r" {2,}", " ", state.turn.user_input.replace(TRIGGER_KEYWORD, "")).strip()
     prompt = build_analysis_prompt(mission, action_history, state.region_history)
     new_region = invoke_claude(prompt, state.turn.agent_model, tools="*", effort="max")
 
@@ -142,6 +148,14 @@ def run():
     output = format_injection(new_region, mission=mission if state.compacted else None)
     sys.stderr.write(output)
     sys.exit(2)
+
+
+def mark_compaction():
+    """PostCompact hook entry point. Creates a marker for the Stop hook."""
+    data = json.loads(sys.stdin.read())
+    data_dir = Path(os.environ["CLAUDE_PLUGIN_DATA"])
+    session_id = data["session_id"]
+    (data_dir / f"{session_id}_compacted").touch()
 
 
 def capture_user_prompt():

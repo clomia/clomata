@@ -12,6 +12,7 @@ from src.main import (
     capture_user_prompt,
     convert_actions_to_markdown,
     invoke_claude,
+    mark_compaction,
     run,
     write_log,
 )
@@ -455,6 +456,8 @@ class TestRun:
             (f"refactor {TRIGGER_KEYWORD} module", "refactor module"),
             (f"build feature {TRIGGER_KEYWORD}", "build feature"),
             ("fix bug", "fix bug"),
+            (f"# Task\nline2\n{TRIGGER_KEYWORD}", "# Task\nline2"),
+            (f"line1\n{TRIGGER_KEYWORD}\nline3", "line1\n\nline3"),
         ],
     )
     def test_strips_trigger_keyword_from_mission(
@@ -498,3 +501,35 @@ class TestRun:
         ):
             run()
         assert exc.value.code == 0
+
+    def test_cleans_compaction_marker(self, tmp_path):
+        marker = tmp_path / "s1_compacted"
+        marker.touch()
+        state = self._make_state(tmp_path, compacted=True, continuing=True)
+        with (
+            patch("src.main.build_state", return_value=state),
+            patch("sys.stdin", io.StringIO("")),
+            patch("src.main.convert_actions_to_markdown", return_value="md"),
+            patch("src.main.invoke_claude", return_value=None),
+            pytest.raises(SystemExit),
+        ):
+            run()
+        assert not marker.exists()
+
+
+# ── mark_compaction ──
+
+
+class TestMarkCompaction:
+    def test_creates_marker_file(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("CLAUDE_PLUGIN_DATA", str(tmp_path))
+        stdin_data = json.dumps(
+            {
+                "session_id": "s1",
+                "trigger": "auto",
+                "compact_summary": "...",
+            }
+        )
+        monkeypatch.setattr("sys.stdin", io.StringIO(stdin_data))
+        mark_compaction()
+        assert (tmp_path / "s1_compacted").exists()
