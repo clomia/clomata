@@ -209,6 +209,18 @@ def build_state(stdin_raw: str) -> State:
                 agent_actions=turn.agent_actions,
                 agent_model=turn.agent_model,
             )
+        else:
+            # Fallback for first-round compaction: compaction happens before
+            # save_initial_turn runs, so the state file has no user_input yet.
+            # The prompt file (written by UserPromptSubmit) survives compaction
+            # and holds the original mission.
+            captured = load_last_user_prompt(prompt_file)
+            if captured is not None:
+                turn = Turn(
+                    user_input=captured,
+                    agent_actions=turn.agent_actions,
+                    agent_model=turn.agent_model,
+                )
     else:
         current_round = 0
         region_history = []

@@ -805,6 +805,54 @@ class TestBuildStateRound1:
         assert state.current_round == 0
         assert state.turn.user_input == "new task"
 
+    def test_first_round_compaction_preserves_mission_via_prompt_file(
+        self, tmp_path, monkeypatch
+    ):
+        """If auto-compaction fires before the first Stop hook, the state file
+        does not exist yet. build_state must fall back to the prompt file
+        (written by UserPromptSubmit) to preserve the original mission."""
+        # Compacted transcript: original prompt is gone, only summary remains
+        t = tmp_path / "transcript.jsonl"
+        write_jsonl(
+            t,
+            [
+                {
+                    "role": "user",
+                    "content": "This session is being continued from a previous conversation...",
+                },
+                {"role": "assistant", "content": "Continuing."},
+            ],
+        )
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        # UserPromptSubmit wrote the original prompt before compaction
+        (data_dir / "s1_last_user_prompt.txt").write_text(
+            "parallaxthink: build feature X"
+        )
+        # PostCompact created the marker
+        (data_dir / "s1_compacted").touch()
+        # State file does NOT exist (finish_round never called)
+        assert not (data_dir / "s1.json").exists()
+
+        monkeypatch.setenv("CLAUDE_PLUGIN_DATA", str(data_dir))
+        monkeypatch.delenv("PARALLAX_INSIDE_RECURSION", raising=False)
+
+        state = build_state(
+            make_stdin(
+                stop_hook_active=False,
+                session_id="s1",
+                transcript_path=str(t),
+            )
+        )
+
+        assert state.compacted is True
+        assert state.continuing is True
+        assert state.current_round == 0
+        assert state.region_history == []
+        # Mission recovered from prompt file, NOT from compaction summary
+        assert state.turn.user_input == "parallaxthink: build feature X"
+
     def test_save_initial_turn_cleans_stale_marker(self, tmp_path, monkeypatch):
         """save_initial_turn removes any leftover compaction marker."""
         data_dir = tmp_path / "data"
