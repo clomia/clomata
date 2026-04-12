@@ -40,7 +40,7 @@ wheels = [
 
 [[package]]
 name = "parallax"
-version = "0.2.10"
+version = "0.2.13"
 source = { editable = "." }
 dependencies = [
     { name = "pydantic" },

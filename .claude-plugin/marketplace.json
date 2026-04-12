@@ -12,7 +12,7 @@
       "name": "parallax",
       "source": "./plugins/parallax",
       "description": "Catches what the agent overlooks and drives complex tasks to completion",
-      "version": "0.2.13",
+      "version": "0.2.14",
       "author": {
         "name": "clomia",
         "email": "clomia.sig@gmail.com"

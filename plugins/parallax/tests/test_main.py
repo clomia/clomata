@@ -144,7 +144,7 @@ class TestConvertActionsToMarkdown:
             args=[], returncode=0, stdout="# Actions\n\nThe agent responded.", stderr=""
         )
         with patch("src.main.subprocess.run", return_value=mock_result) as mock_run:
-            result = convert_actions_to_markdown(actions, "claude-opus-4-6", tmp_path)
+            result = convert_actions_to_markdown(actions, tmp_path)
             assert result == "# Actions\n\nThe agent responded."
             stdin_prompt = mock_run.call_args[1]["input"]
             assert "Action record file:" in stdin_prompt
@@ -159,7 +159,7 @@ class TestConvertActionsToMarkdown:
             args=[], returncode=1, stdout="", stderr="error"
         )
         with patch("src.main.subprocess.run", return_value=mock_result):
-            result = convert_actions_to_markdown(actions, None, tmp_path)
+            result = convert_actions_to_markdown(actions, tmp_path)
             assert result == json.dumps(actions, ensure_ascii=False, indent=2)
 
     def test_cleans_up_temp_file(self, tmp_path):
@@ -168,7 +168,7 @@ class TestConvertActionsToMarkdown:
             args=[], returncode=0, stdout="ok", stderr=""
         )
         with patch("src.main.subprocess.run", return_value=mock_result):
-            convert_actions_to_markdown(actions, None, tmp_path)
+            convert_actions_to_markdown(actions, tmp_path)
         temp_files = list(tmp_path.glob("_conversion_*.json"))
         assert temp_files == []
 
@@ -176,7 +176,7 @@ class TestConvertActionsToMarkdown:
         actions = [{"role": "assistant", "content": "done"}]
         with patch("src.main.subprocess.run", side_effect=OSError("spawn failed")):
             with pytest.raises(OSError):
-                convert_actions_to_markdown(actions, None, tmp_path)
+                convert_actions_to_markdown(actions, tmp_path)
         temp_files = list(tmp_path.glob("_conversion_*.json"))
         assert temp_files == []
 

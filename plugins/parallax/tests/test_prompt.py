@@ -54,7 +54,10 @@ class TestPromptConstants:
         assert "# Background" in ROLE_PROMPT
 
     def test_instruction_prompt_loaded(self):
-        assert "<PARALLAXDONE!>" in INSTRUCTION_PROMPT
+        assert (
+            "I_FIND_NO_FURTHER_REGION_WORTH_SURFACING_ENDING_THE_PARALLAX_TURN"
+            in INSTRUCTION_PROMPT
+        )
 
 
 # ── format_conversion_prompt ──

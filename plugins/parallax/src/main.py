@@ -21,10 +21,8 @@ from src.state import ROUND_LIMIT, build_state, finish_round, save_initial_turn
 
 TRIGGER_KEYWORD = "parallaxthink"
 # Sentinel the advisory agent emits to end the turn.  Checked with `in` so
-# the signal survives reasoning text that thinking-disabled models cannot
-# suppress (e.g. "No more unexplored regions.\n\n<PARALLAXDONE!>").  The
-# token is unique to parallax and will not appear in normal region output.
-TERMINATION_TOKEN = "<PARALLAXDONE!>"
+# the signal survives surrounding prose the model may emit alongside it.
+TERMINATION_TOKEN = "I_FIND_NO_FURTHER_REGION_WORTH_SURFACING_ENDING_THE_PARALLAX_TURN"
 DISALLOWED_TOOLS = "Bash,Write,Edit,NotebookEdit"
 
 
@@ -63,20 +61,21 @@ def invoke_claude(
     return None
 
 
-def convert_actions_to_markdown(
-    actions: list[dict], model: str | None, data_dir: Path
-) -> str:
+def convert_actions_to_markdown(actions: list[dict], data_dir: Path) -> str:
     """Convert agent actions to a markdown document via claude -p.
 
     Saves the action record to a temporary file and instructs the
     conversion agent to read from it, avoiding input token limits
     for large transcripts.  Falls back to raw JSON on failure.
+
+    Always uses Haiku — this task is pure format conversion with no
+    reasoning required.
     """
     temp_file = data_dir / f"_conversion_{os.getpid()}.json"
     try:
         temp_file.write_text(json.dumps(actions, ensure_ascii=False, indent=2))
         prompt = format_conversion_prompt(str(temp_file))
-        result = invoke_claude(prompt, model, tools="Read")
+        result = invoke_claude(prompt, "haiku", tools="Read")
         return result or json.dumps(actions, ensure_ascii=False, indent=2)
     finally:
         temp_file.unlink(missing_ok=True)
@@ -135,7 +134,7 @@ def run():
     log_file = state.env.data_dir / f"{state.hook.session_id}_parallax.log"
 
     action_history = convert_actions_to_markdown(
-        state.turn.agent_actions, state.turn.agent_model, state.env.data_dir
+        state.turn.agent_actions, state.env.data_dir
     )
     mission = state.turn.user_input.strip().removesuffix(TRIGGER_KEYWORD).strip()
     prompt = build_analysis_prompt(mission, action_history, state.region_history)
