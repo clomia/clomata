@@ -10,14 +10,7 @@ PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 
 ROLE_PROMPT = (PROMPTS_DIR / "role.md").read_text().strip()
 INSTRUCTION_PROMPT = (PROMPTS_DIR / "instruction.md").read_text().strip()
-
-CONVERSION_PROMPT_TEMPLATE = """\
-Read the JSON file at the path below. This is the main agent's task execution record.
-Produce a markdown document that systematically enumerates every thought, attempt, and result from the agent's execution.
-
-Ignore metadata outside the agent's own awareness, such as token usage, API turn counts, or signatures.
-
-Action record file: {file_path}"""
+CONVERSION_PROMPT_TEMPLATE = (PROMPTS_DIR / "conversion.md").read_text().strip()
 
 CAUTION_TEXT = """\
 NEVER end your task by asking the user a question or making a request in plain text.

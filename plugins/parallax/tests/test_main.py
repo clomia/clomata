@@ -147,7 +147,7 @@ class TestConvertActionsToMarkdown:
             result = convert_actions_to_markdown(actions, tmp_path)
             assert result == "# Actions\n\nThe agent responded."
             stdin_prompt = mock_run.call_args[1]["input"]
-            assert "Action record file:" in stdin_prompt
+            assert "Record file:" in stdin_prompt
             assert str(tmp_path) in stdin_prompt
             cmd = mock_run.call_args[0][0]
             idx = cmd.index("--tools")

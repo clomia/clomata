@@ -70,11 +70,11 @@ class TestFormatConversionPrompt:
 
     def test_includes_instruction_text(self):
         prompt = format_conversion_prompt("/tmp/actions.json")
-        assert "Produce a markdown document" in prompt
+        assert "produce a markdown document" in prompt
 
     def test_references_file_not_inline_json(self):
         prompt = format_conversion_prompt("/tmp/actions.json")
-        assert "Action record file:" in prompt
+        assert "Record file:" in prompt
         assert "<action-record>" not in prompt
 
 
