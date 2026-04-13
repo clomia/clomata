@@ -51,6 +51,14 @@ sequenceDiagram
             PX-->>HC: Inject region as feedback
             HC->>+MA: Deliver surfaced region
             Note right of MA: Context persists and grows
+
+            opt Auto-compaction occurs
+                rect rgba(255, 220, 100, 0.12)
+                Note over HC,SS: PostCompact Hook
+                HC->>SS: Mark compaction occurred
+                end
+            end
+
             MA-->>-HC: Turn complete
         end
     end
