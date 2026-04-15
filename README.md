@@ -35,7 +35,9 @@ claude plugin install parallax@claude-automata
 
 > Example: Make a tic-tac-toe game in HTML. parallaxthink
 
-Use the `/parallax-log` command to view the most recent parallax log.
+parallax operates based on the current prompt without prior context. It is therefore most effective when used at the start of a session.
+
+After use, run `/parallax-log` to see what regions parallax surfaced.
 
 # Appendix: Plugin Management Commands
 
