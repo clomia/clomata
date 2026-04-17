@@ -12,6 +12,23 @@ from pydantic import BaseModel, ConfigDict
 
 ROUND_LIMIT = 30
 
+MODEL_FAMILIES = ("opus", "sonnet", "haiku")
+
+
+def normalize_model(model: str | None) -> str | None:
+    """Extract model family (opus/sonnet/haiku) from a full model ID.
+
+    Keeps parallax decoupled from Anthropic's versioning scheme — the
+    advisory agent only needs the family, not the exact version.  Unknown
+    strings pass through unchanged so the CLI can still resolve aliases.
+    """
+    if not model:
+        return None
+    for family in MODEL_FAMILIES:
+        if family in model:
+            return family
+    return model
+
 
 # ── Input models ──
 
@@ -112,7 +129,7 @@ def parse_turn(transcript_path: str) -> Turn:
     return Turn(
         user_input=user_input,
         agent_actions=messages[last_prompt_idx + 1 :],
-        agent_model=agent_model,
+        agent_model=normalize_model(agent_model),
     )
 
 

@@ -59,10 +59,10 @@ class TestInvokeClaude:
             args=[], returncode=0, stdout="ok", stderr=""
         )
         with patch("src.main.subprocess.run", return_value=mock_result) as mock_run:
-            invoke_claude("test", "claude-opus-4-6")
+            invoke_claude("test", "opus")
             cmd = mock_run.call_args[0][0]
             assert "--model" in cmd
-            assert "claude-opus-4-6" in cmd
+            assert "opus" in cmd
 
     def test_passes_effort_flag(self):
         mock_result = subprocess.CompletedProcess(
@@ -415,7 +415,7 @@ class TestRun:
             turn=Turn(
                 user_input=user_input,
                 agent_actions=[],
-                agent_model="claude-opus-4-6",
+                agent_model="opus",
             ),
         )
 

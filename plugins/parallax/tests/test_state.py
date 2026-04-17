@@ -3,6 +3,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from src.state import (
     HookInput,
     PluginEnvironment,
@@ -13,6 +15,7 @@ from src.state import (
     finish_round,
     load_last_user_prompt,
     load_turn_state,
+    normalize_model,
     parse_turn,
     save_initial_turn,
     save_turn_state,
@@ -184,6 +187,33 @@ class TestFinishRound:
         assert saved["regions"] == ["Add tests", "Handle edge cases", "Add logging"]
 
 
+# ── normalize_model ──
+
+
+class TestNormalizeModel:
+    @pytest.mark.parametrize(
+        "raw,expected",
+        [
+            ("opus", "opus"),
+            ("claude-opus-4-7", "opus"),
+            ("claude-sonnet-4-5", "sonnet"),
+            ("claude-sonnet-4-6", "sonnet"),
+            ("claude-haiku-4-5-20251001", "haiku"),
+            ("opus", "opus"),
+            ("sonnet", "sonnet"),
+        ],
+    )
+    def test_returns_family_for_known_models(self, raw, expected):
+        assert normalize_model(raw) == expected
+
+    @pytest.mark.parametrize("raw", [None, ""])
+    def test_returns_none_for_missing_value(self, raw):
+        assert normalize_model(raw) is None
+
+    def test_passes_through_unknown_model(self):
+        assert normalize_model("some-unknown-model") == "some-unknown-model"
+
+
 # ── extract_user_input ──
 
 
@@ -259,18 +289,40 @@ class TestParseTurn:
         assert turn.agent_actions[0]["content"] == "step 1"
 
     def test_extracts_agent_model(self, tmp_path):
+        """parse_turn picks the model from the most recent assistant message."""
         t = tmp_path / "t.jsonl"
         write_jsonl(
             t,
             [
                 {"role": "user", "content": "hello"},
-                {"role": "assistant", "content": "hi", "model": "claude-sonnet-4-6"},
+                {"role": "assistant", "content": "hi", "model": "sonnet"},
                 {"role": "user", "content": "bye"},
-                {"role": "assistant", "content": "ok", "model": "claude-opus-4-6"},
+                {"role": "assistant", "content": "ok", "model": "opus"},
             ],
         )
         turn = parse_turn(str(t))
-        assert turn.agent_model == "claude-opus-4-6"
+        assert turn.agent_model == "opus"
+
+    @pytest.mark.parametrize(
+        "full_id,family",
+        [
+            ("claude-opus-4-7", "opus"),
+            ("claude-sonnet-4-6", "sonnet"),
+            ("claude-haiku-4-5-20251001", "haiku"),
+        ],
+    )
+    def test_normalizes_agent_model_to_family(self, tmp_path, full_id, family):
+        """Full model IDs from the transcript normalize to the family name."""
+        t = tmp_path / "t.jsonl"
+        write_jsonl(
+            t,
+            [
+                {"role": "user", "content": "hi"},
+                {"role": "assistant", "content": "ok", "model": full_id},
+            ],
+        )
+        turn = parse_turn(str(t))
+        assert turn.agent_model == family
 
     def test_multi_turn_uses_last_prompt(self, tmp_path):
         t = tmp_path / "t.jsonl"
@@ -315,7 +367,7 @@ class TestParseTurn:
         t = tmp_path / "t.jsonl"
         prev_turn = [
             {"role": "user", "content": "set up project"},
-            {"role": "assistant", "content": "done", "model": "claude-opus-4-6"},
+            {"role": "assistant", "content": "done", "model": "opus"},
         ]
         assistant_read = {
             "role": "assistant",
@@ -323,7 +375,7 @@ class TestParseTurn:
                 {"type": "text", "text": "Reading file"},
                 {"type": "tool_use", "id": "t1", "name": "Read", "input": {}},
             ],
-            "model": "claude-opus-4-6",
+            "model": "opus",
         }
         tool_result_read = {
             "role": "user",
@@ -336,7 +388,7 @@ class TestParseTurn:
             "content": [
                 {"type": "tool_use", "id": "t2", "name": "Edit", "input": {}},
             ],
-            "model": "claude-opus-4-6",
+            "model": "opus",
         }
         tool_result_edit = {
             "role": "user",
@@ -347,7 +399,7 @@ class TestParseTurn:
         assistant_final = {
             "role": "assistant",
             "content": "All done.",
-            "model": "claude-opus-4-6",
+            "model": "opus",
         }
         current_actions = [
             assistant_read,
@@ -362,7 +414,7 @@ class TestParseTurn:
         )
         turn = parse_turn(str(t))
         assert turn.user_input == "fix the bug"
-        assert turn.agent_model == "claude-opus-4-6"
+        assert turn.agent_model == "opus"
         assert len(turn.agent_actions) == len(current_actions)
         for actual, expected in zip(turn.agent_actions, current_actions):
             assert actual == expected
@@ -488,7 +540,7 @@ class TestBuildStateRound1:
                 {
                     "role": "assistant",
                     "content": "Committed.",
-                    "model": "claude-opus-4-6",
+                    "model": "opus",
                 },
             ],
         )
@@ -510,7 +562,7 @@ class TestBuildStateRound1:
 
         assert state.turn.user_input == "/commit push"
         assert state.turn.agent_actions == [
-            {"role": "assistant", "content": "Committed.", "model": "claude-opus-4-6"}
+            {"role": "assistant", "content": "Committed.", "model": "opus"}
         ]
 
     def test_falls_back_to_transcript_without_captured_prompt(
@@ -521,7 +573,7 @@ class TestBuildStateRound1:
             t,
             [
                 {"role": "user", "content": "fix the login bug"},
-                {"role": "assistant", "content": "Fixed.", "model": "claude-opus-4-6"},
+                {"role": "assistant", "content": "Fixed.", "model": "opus"},
             ],
         )
         data_dir = tmp_path / "data"
@@ -625,7 +677,7 @@ class TestBuildStateRound1:
                 },
                 # Real prompt (LAST user(str))
                 {"role": "user", "content": "now fix the tests"},
-                {"role": "assistant", "content": "On it.", "model": "claude-opus-4-6"},
+                {"role": "assistant", "content": "On it.", "model": "opus"},
             ],
         )
         data_dir = tmp_path / "data"
@@ -661,7 +713,7 @@ class TestBuildStateRound1:
                 {
                     "role": "assistant",
                     "content": "Continuing.",
-                    "model": "claude-opus-4-6",
+                    "model": "opus",
                 },
             ],
         )
